@@ -1,0 +1,51 @@
+{
+  "name": "industrial-sim",
+  "version-semver": "0.1.0",
+  "description": "Proprietary offline-first industrial simulation platform",
+  "license": "LicenseRef-Proprietary",
+  "builtin-baseline": "9eec002df1cd109f8f104cd966a763daf9751489",
+  "dependencies": [],
+  "features": {
+    "tests": {
+      "description": "Headless tests",
+      "dependencies": [
+        "gtest"
+      ]
+    },
+    "persistence": {
+      "description": "Reserved for the next persistence increment",
+      "dependencies": [
+        "nlohmann-json",
+        "json-schema-validator",
+        {
+          "name": "minizip-ng",
+          "default-features": false,
+          "features": [
+            "zlib"
+          ]
+        }
+      ]
+    },
+    "desktop": {
+      "description": "Reserved dependencies; desktop application pending",
+      "dependencies": [
+        {
+          "name": "qtbase",
+          "default-features": false,
+          "features": [
+            "widgets",
+            "opengl"
+          ]
+        },
+        {
+          "name": "vtk",
+          "default-features": false,
+          "features": [
+            "qt",
+            "opengl"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,32 @@
+name: Windows headless
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        preset: [windows-msvc-debug, windows-msvc-release]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: Prepare pinned vcpkg
+        shell: pwsh
+        run: |
+          $path = Join-Path $env:RUNNER_TEMP 'sim-vcpkg'
+          git clone --depth 1 --branch 2026.10.16 https://github.com/microsoft/vcpkg.git $path
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $actual = git -C $path rev-parse HEAD
+          if ($actual -ne '9eec002df1cd109f8f104cd966a763daf9751489') { throw 'Unexpected vcpkg revision' }
+          & "$path/bootstrap-vcpkg.bat" -disableMetrics
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "VCPKG_ROOT=$path" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }}
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }}

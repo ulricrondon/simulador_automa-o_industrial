@@ -1,0 +1,256 @@
+{
+  "debug": {
+    "compiler": "GCC 16.2.0",
+    "tests": 24,
+    "failed": 0,
+    "cases": [
+      {
+        "name": "Cache.BudgetEvictsCheapEntryFromColdWindow",
+        "status": "run",
+        "seconds": "0.01774"
+      },
+      {
+        "name": "Cache.LruAccessProtectsRecentlyUsedEntry",
+        "status": "run",
+        "seconds": "0.025941"
+      },
+      {
+        "name": "Cache.EvictionPreservesExternalOwnershipAndWeakRecovery",
+        "status": "run",
+        "seconds": "0.015726"
+      },
+      {
+        "name": "Cache.OversizeAssetIsWeakOnlyAndExpires",
+        "status": "run",
+        "seconds": "0.009871"
+      },
+      {
+        "name": "Cache.MetadataIsBoundedEvenWhenClientsKeepAssetsAlive",
+        "status": "run",
+        "seconds": "0.020532"
+      },
+      {
+        "name": "Cache.BudgetReductionReleasesRetentionButNotClients",
+        "status": "run",
+        "seconds": "0.01688"
+      },
+      {
+        "name": "Cache.ImmutableIdentityAndConflictingContent",
+        "status": "run",
+        "seconds": "0.019324"
+      },
+      {
+        "name": "Cache.ConcurrentReadersAndPublishersKeepBudget",
+        "status": "run",
+        "seconds": "0.020135"
+      },
+      {
+        "name": "Queue.RejectsOverflowPreservesFifoAndDrainsAfterClose",
+        "status": "run",
+        "seconds": "0.014604"
+      },
+      {
+        "name": "Queue.StopWakesBlockedConsumerWithoutSleep",
+        "status": "run",
+        "seconds": "0.014691"
+      },
+      {
+        "name": "Queue.ZeroCapacityIsRejected",
+        "status": "run",
+        "seconds": "0.012247"
+      },
+      {
+        "name": "Runner.DedicatedExecutionMatchesPureCoreAndPublishesConstData",
+        "status": "run",
+        "seconds": "0.014884"
+      },
+      {
+        "name": "Runner.InvalidSubmissionDoesNotPoisonScheduler",
+        "status": "run",
+        "seconds": "0.01478"
+      },
+      {
+        "name": "Runner.DestructionSettlesAllAcceptedFutures",
+        "status": "run",
+        "seconds": "0.011779"
+      },
+      {
+        "name": "Runner.CapacityIsBounded",
+        "status": "run",
+        "seconds": "0.016979"
+      },
+      {
+        "name": "Simulation.GoldenTraceConnectsElectricalLogicAndBoundedMotion",
+        "status": "run",
+        "seconds": "0.014955"
+      },
+      {
+        "name": "Simulation.ReplayIsIdenticalAcross100ShuffledEventOrders",
+        "status": "run",
+        "seconds": "0.014845"
+      },
+      {
+        "name": "Simulation.CoilsReadPreviousScanAndRungOrderDoesNotMatter",
+        "status": "run",
+        "seconds": "0.014625"
+      },
+      {
+        "name": "Simulation.SeriesParallelAndNormallyClosedContacts",
+        "status": "run",
+        "seconds": "0.015458"
+      },
+      {
+        "name": "Simulation.RejectsDuplicateSequenceAndOutOfRangeEvents",
+        "status": "run",
+        "seconds": "0.015183"
+      },
+      {
+        "name": "Simulation.RejectsInvalidProgramAndLimits",
+        "status": "run",
+        "seconds": "0.01589"
+      },
+      {
+        "name": "Simulation.AxisSaturatesWithoutIntegerOverflow",
+        "status": "run",
+        "seconds": "0.014756"
+      },
+      {
+        "name": "Simulation.CancellationDoesNotReturnPartialSuccess",
+        "status": "run",
+        "seconds": "0.014594"
+      },
+      {
+        "name": "headless_demo",
+        "status": "run",
+        "seconds": "2.20438"
+      }
+    ]
+  },
+  "release": {
+    "compiler": "GCC 16.2.0",
+    "tests": 24,
+    "failed": 0,
+    "cases": [
+      {
+        "name": "Cache.BudgetEvictsCheapEntryFromColdWindow",
+        "status": "run",
+        "seconds": "0.015742"
+      },
+      {
+        "name": "Cache.LruAccessProtectsRecentlyUsedEntry",
+        "status": "run",
+        "seconds": "0.015619"
+      },
+      {
+        "name": "Cache.EvictionPreservesExternalOwnershipAndWeakRecovery",
+        "status": "run",
+        "seconds": "0.018702"
+      },
+      {
+        "name": "Cache.OversizeAssetIsWeakOnlyAndExpires",
+        "status": "run",
+        "seconds": "0.021021"
+      },
+      {
+        "name": "Cache.MetadataIsBoundedEvenWhenClientsKeepAssetsAlive",
+        "status": "run",
+        "seconds": "0.019286"
+      },
+      {
+        "name": "Cache.BudgetReductionReleasesRetentionButNotClients",
+        "status": "run",
+        "seconds": "0.020627"
+      },
+      {
+        "name": "Cache.ImmutableIdentityAndConflictingContent",
+        "status": "run",
+        "seconds": "0.014475"
+      },
+      {
+        "name": "Cache.ConcurrentReadersAndPublishersKeepBudget",
+        "status": "run",
+        "seconds": "0.015913"
+      },
+      {
+        "name": "Queue.RejectsOverflowPreservesFifoAndDrainsAfterClose",
+        "status": "run",
+        "seconds": "0.016087"
+      },
+      {
+        "name": "Queue.StopWakesBlockedConsumerWithoutSleep",
+        "status": "run",
+        "seconds": "0.01469"
+      },
+      {
+        "name": "Queue.ZeroCapacityIsRejected",
+        "status": "run",
+        "seconds": "0.016807"
+      },
+      {
+        "name": "Runner.DedicatedExecutionMatchesPureCoreAndPublishesConstData",
+        "status": "run",
+        "seconds": "0.016405"
+      },
+      {
+        "name": "Runner.InvalidSubmissionDoesNotPoisonScheduler",
+        "status": "run",
+        "seconds": "0.021809"
+      },
+      {
+        "name": "Runner.DestructionSettlesAllAcceptedFutures",
+        "status": "run",
+        "seconds": "0.017276"
+      },
+      {
+        "name": "Runner.CapacityIsBounded",
+        "status": "run",
+        "seconds": "0.024419"
+      },
+      {
+        "name": "Simulation.GoldenTraceConnectsElectricalLogicAndBoundedMotion",
+        "status": "run",
+        "seconds": "0.02197"
+      },
+      {
+        "name": "Simulation.ReplayIsIdenticalAcross100ShuffledEventOrders",
+        "status": "run",
+        "seconds": "0.021929"
+      },
+      {
+        "name": "Simulation.CoilsReadPreviousScanAndRungOrderDoesNotMatter",
+        "status": "run",
+        "seconds": "0.024136"
+      },
+      {
+        "name": "Simulation.SeriesParallelAndNormallyClosedContacts",
+        "status": "run",
+        "seconds": "0.024476"
+      },
+      {
+        "name": "Simulation.RejectsDuplicateSequenceAndOutOfRangeEvents",
+        "status": "run",
+        "seconds": "0.024788"
+      },
+      {
+        "name": "Simulation.RejectsInvalidProgramAndLimits",
+        "status": "run",
+        "seconds": "0.020707"
+      },
+      {
+        "name": "Simulation.AxisSaturatesWithoutIntegerOverflow",
+        "status": "run",
+        "seconds": "0.016161"
+      },
+      {
+        "name": "Simulation.CancellationDoesNotReturnPartialSuccess",
+        "status": "run",
+        "seconds": "0.022508"
+      },
+      {
+        "name": "headless_demo",
+        "status": "run",
+        "seconds": "2.36719"
+      }
+    ]
+  }
+}
