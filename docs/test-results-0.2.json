@@ -1,0 +1,424 @@
+{
+  "debug": {
+    "compiler": "GCC 16.2.0",
+    "tests": 51,
+    "failed": 0,
+    "cases": [
+      {
+        "name": "Cache.BudgetEvictsCheapEntryFromColdWindow",
+        "seconds": "0.018973"
+      },
+      {
+        "name": "Cache.LruAccessProtectsRecentlyUsedEntry",
+        "seconds": "0.023592"
+      },
+      {
+        "name": "Cache.EvictionPreservesExternalOwnershipAndWeakRecovery",
+        "seconds": "0.027234"
+      },
+      {
+        "name": "Cache.OversizeAssetIsWeakOnlyAndExpires",
+        "seconds": "0.026421"
+      },
+      {
+        "name": "Cache.MetadataIsBoundedEvenWhenClientsKeepAssetsAlive",
+        "seconds": "0.029686"
+      },
+      {
+        "name": "Cache.BudgetReductionReleasesRetentionButNotClients",
+        "seconds": "0.026239"
+      },
+      {
+        "name": "Cache.ImmutableIdentityAndConflictingContent",
+        "seconds": "0.02083"
+      },
+      {
+        "name": "Cache.ConcurrentReadersAndPublishersKeepBudget",
+        "seconds": "0.017855"
+      },
+      {
+        "name": "Queue.RejectsOverflowPreservesFifoAndDrainsAfterClose",
+        "seconds": "0.021492"
+      },
+      {
+        "name": "Queue.StopWakesBlockedConsumerWithoutSleep",
+        "seconds": "0.014649"
+      },
+      {
+        "name": "Queue.ZeroCapacityIsRejected",
+        "seconds": "0.016518"
+      },
+      {
+        "name": "Runner.DedicatedExecutionMatchesPureCoreAndPublishesConstData",
+        "seconds": "0.018183"
+      },
+      {
+        "name": "Runner.InvalidSubmissionDoesNotPoisonScheduler",
+        "seconds": "0.013189"
+      },
+      {
+        "name": "Runner.DestructionSettlesAllAcceptedFutures",
+        "seconds": "0.012267"
+      },
+      {
+        "name": "Runner.CapacityIsBounded",
+        "seconds": "0.008479"
+      },
+      {
+        "name": "Simulation.GoldenTraceConnectsElectricalLogicAndBoundedMotion",
+        "seconds": "0.014122"
+      },
+      {
+        "name": "Simulation.ReplayIsIdenticalAcross100ShuffledEventOrders",
+        "seconds": "0.011664"
+      },
+      {
+        "name": "Simulation.CoilsReadPreviousScanAndRungOrderDoesNotMatter",
+        "seconds": "0.011782"
+      },
+      {
+        "name": "Simulation.SeriesParallelAndNormallyClosedContacts",
+        "seconds": "0.019962"
+      },
+      {
+        "name": "Simulation.RejectsDuplicateSequenceAndOutOfRangeEvents",
+        "seconds": "0.00909"
+      },
+      {
+        "name": "Simulation.RejectsInvalidProgramAndLimits",
+        "seconds": "0.009182"
+      },
+      {
+        "name": "Simulation.AxisSaturatesWithoutIntegerOverflow",
+        "seconds": "0.008692"
+      },
+      {
+        "name": "Simulation.CancellationDoesNotReturnPartialSuccess",
+        "seconds": "0.008988"
+      },
+      {
+        "name": "Project.FixtureRoundTripPreservesIdentityAndEntireTrace",
+        "seconds": "0.014699"
+      },
+      {
+        "name": "Project.NewDocumentsHaveFreshIdentityButSameSimulation",
+        "seconds": "0.020003"
+      },
+      {
+        "name": "Project.UnicodeTitleSurvivesRoundTrip",
+        "seconds": "0.013379"
+      },
+      {
+        "name": "Project.RejectsMissingAndUnknownFieldsAtEveryLevel",
+        "seconds": "0.013844"
+      },
+      {
+        "name": "Project.VersionsRequireExplicitMigration",
+        "seconds": "0.011542"
+      },
+      {
+        "name": "Project.InvalidEnvelopeAndWrongFormatAreRejected",
+        "seconds": "0.013489"
+      },
+      {
+        "name": "Project.DuplicateKeysIncludingEscapedKeysAreRejected",
+        "seconds": "0.009211"
+      },
+      {
+        "name": "Project.InvalidJsonTrailingDataAndInvalidUtf8AreRejected",
+        "seconds": "0.016386"
+      },
+      {
+        "name": "Project.SizeAndNestingAreBoundedBeforeSchemaValidation",
+        "seconds": "0.029029"
+      },
+      {
+        "name": "Project.FloatingPointAndHugeNumericTokensAreRejected",
+        "seconds": "0.013721"
+      },
+      {
+        "name": "Project.SignedIntegerOverflowCannotWrapDuringDecode",
+        "seconds": "0.01372"
+      },
+      {
+        "name": "Project.LargeSignedDomainSequenceIsPreservedExactly",
+        "seconds": "0.012733"
+      },
+      {
+        "name": "Project.CoreSemanticErrorsAreRejectedBeforeExecution",
+        "seconds": "0.013823"
+      },
+      {
+        "name": "Project.CrossEntityUuidDuplicatesAreRejected",
+        "seconds": "0.012848"
+      },
+      {
+        "name": "Project.InvalidInMemoryDocumentsCannotBeSerialized",
+        "seconds": "0.015836"
+      },
+      {
+        "name": "Project.AssetsRoundTripButConflictingCatalogMetadataIsRejected",
+        "seconds": "0.01463"
+      },
+      {
+        "name": "Project.UnicodeFilePathLoadsWithoutLocaleConversion",
+        "seconds": "0.022557"
+      },
+      {
+        "name": "Project.MissingFileIsReportedAsIoError",
+        "seconds": "0.019264"
+      },
+      {
+        "name": "Project.IndependentThreadsValidateAndReplayTheSameDocument",
+        "seconds": "0.023705"
+      },
+      {
+        "name": "Identity.UuidGeneratorSetsVersionVariantAndProducesDistinctValues",
+        "seconds": "0.013982"
+      },
+      {
+        "name": "Identity.RejectsMalformedNonV4AndUppercaseUuids",
+        "seconds": "0.010333"
+      },
+      {
+        "name": "Identity.Sha256MatchesKnownVectors",
+        "seconds": "0.011398"
+      },
+      {
+        "name": "Identity.DigestsMustBeCanonicalLowercaseHex",
+        "seconds": "0.014021"
+      },
+      {
+        "name": "Integrity.ChecksBothSizeAndDigestBeforeAcceptance",
+        "seconds": "0.011127"
+      },
+      {
+        "name": "headless_demo",
+        "seconds": "0.012204"
+      },
+      {
+        "name": "project_validate",
+        "seconds": "0.015993"
+      },
+      {
+        "name": "project_run",
+        "seconds": "0.012776"
+      },
+      {
+        "name": "project_cli_roundtrip",
+        "seconds": "0.157723"
+      }
+    ]
+  },
+  "release": {
+    "compiler": "GCC 16.2.0",
+    "tests": 51,
+    "failed": 0,
+    "cases": [
+      {
+        "name": "Cache.BudgetEvictsCheapEntryFromColdWindow",
+        "seconds": "0.014354"
+      },
+      {
+        "name": "Cache.LruAccessProtectsRecentlyUsedEntry",
+        "seconds": "0.024849"
+      },
+      {
+        "name": "Cache.EvictionPreservesExternalOwnershipAndWeakRecovery",
+        "seconds": "0.021461"
+      },
+      {
+        "name": "Cache.OversizeAssetIsWeakOnlyAndExpires",
+        "seconds": "0.019706"
+      },
+      {
+        "name": "Cache.MetadataIsBoundedEvenWhenClientsKeepAssetsAlive",
+        "seconds": "0.018658"
+      },
+      {
+        "name": "Cache.BudgetReductionReleasesRetentionButNotClients",
+        "seconds": "0.009748"
+      },
+      {
+        "name": "Cache.ImmutableIdentityAndConflictingContent",
+        "seconds": "0.012821"
+      },
+      {
+        "name": "Cache.ConcurrentReadersAndPublishersKeepBudget",
+        "seconds": "0.012382"
+      },
+      {
+        "name": "Queue.RejectsOverflowPreservesFifoAndDrainsAfterClose",
+        "seconds": "0.008463"
+      },
+      {
+        "name": "Queue.StopWakesBlockedConsumerWithoutSleep",
+        "seconds": "0.009755"
+      },
+      {
+        "name": "Queue.ZeroCapacityIsRejected",
+        "seconds": "0.016434"
+      },
+      {
+        "name": "Runner.DedicatedExecutionMatchesPureCoreAndPublishesConstData",
+        "seconds": "0.009"
+      },
+      {
+        "name": "Runner.InvalidSubmissionDoesNotPoisonScheduler",
+        "seconds": "0.010754"
+      },
+      {
+        "name": "Runner.DestructionSettlesAllAcceptedFutures",
+        "seconds": "0.012764"
+      },
+      {
+        "name": "Runner.CapacityIsBounded",
+        "seconds": "0.010154"
+      },
+      {
+        "name": "Simulation.GoldenTraceConnectsElectricalLogicAndBoundedMotion",
+        "seconds": "0.010574"
+      },
+      {
+        "name": "Simulation.ReplayIsIdenticalAcross100ShuffledEventOrders",
+        "seconds": "0.01138"
+      },
+      {
+        "name": "Simulation.CoilsReadPreviousScanAndRungOrderDoesNotMatter",
+        "seconds": "0.0108"
+      },
+      {
+        "name": "Simulation.SeriesParallelAndNormallyClosedContacts",
+        "seconds": "0.01031"
+      },
+      {
+        "name": "Simulation.RejectsDuplicateSequenceAndOutOfRangeEvents",
+        "seconds": "0.009372"
+      },
+      {
+        "name": "Simulation.RejectsInvalidProgramAndLimits",
+        "seconds": "0.026979"
+      },
+      {
+        "name": "Simulation.AxisSaturatesWithoutIntegerOverflow",
+        "seconds": "0.026362"
+      },
+      {
+        "name": "Simulation.CancellationDoesNotReturnPartialSuccess",
+        "seconds": "0.023642"
+      },
+      {
+        "name": "Project.FixtureRoundTripPreservesIdentityAndEntireTrace",
+        "seconds": "0.029005"
+      },
+      {
+        "name": "Project.NewDocumentsHaveFreshIdentityButSameSimulation",
+        "seconds": "0.03054"
+      },
+      {
+        "name": "Project.UnicodeTitleSurvivesRoundTrip",
+        "seconds": "0.014194"
+      },
+      {
+        "name": "Project.RejectsMissingAndUnknownFieldsAtEveryLevel",
+        "seconds": "0.012708"
+      },
+      {
+        "name": "Project.VersionsRequireExplicitMigration",
+        "seconds": "0.010606"
+      },
+      {
+        "name": "Project.InvalidEnvelopeAndWrongFormatAreRejected",
+        "seconds": "0.012361"
+      },
+      {
+        "name": "Project.DuplicateKeysIncludingEscapedKeysAreRejected",
+        "seconds": "0.011668"
+      },
+      {
+        "name": "Project.InvalidJsonTrailingDataAndInvalidUtf8AreRejected",
+        "seconds": "0.010925"
+      },
+      {
+        "name": "Project.SizeAndNestingAreBoundedBeforeSchemaValidation",
+        "seconds": "0.025596"
+      },
+      {
+        "name": "Project.FloatingPointAndHugeNumericTokensAreRejected",
+        "seconds": "0.013402"
+      },
+      {
+        "name": "Project.SignedIntegerOverflowCannotWrapDuringDecode",
+        "seconds": "0.009696"
+      },
+      {
+        "name": "Project.LargeSignedDomainSequenceIsPreservedExactly",
+        "seconds": "0.010349"
+      },
+      {
+        "name": "Project.CoreSemanticErrorsAreRejectedBeforeExecution",
+        "seconds": "0.013492"
+      },
+      {
+        "name": "Project.CrossEntityUuidDuplicatesAreRejected",
+        "seconds": "0.010327"
+      },
+      {
+        "name": "Project.InvalidInMemoryDocumentsCannotBeSerialized",
+        "seconds": "0.013606"
+      },
+      {
+        "name": "Project.AssetsRoundTripButConflictingCatalogMetadataIsRejected",
+        "seconds": "0.011107"
+      },
+      {
+        "name": "Project.UnicodeFilePathLoadsWithoutLocaleConversion",
+        "seconds": "0.017672"
+      },
+      {
+        "name": "Project.MissingFileIsReportedAsIoError",
+        "seconds": "0.009846"
+      },
+      {
+        "name": "Project.IndependentThreadsValidateAndReplayTheSameDocument",
+        "seconds": "0.017103"
+      },
+      {
+        "name": "Identity.UuidGeneratorSetsVersionVariantAndProducesDistinctValues",
+        "seconds": "0.010062"
+      },
+      {
+        "name": "Identity.RejectsMalformedNonV4AndUppercaseUuids",
+        "seconds": "0.011947"
+      },
+      {
+        "name": "Identity.Sha256MatchesKnownVectors",
+        "seconds": "0.011438"
+      },
+      {
+        "name": "Identity.DigestsMustBeCanonicalLowercaseHex",
+        "seconds": "0.009528"
+      },
+      {
+        "name": "Integrity.ChecksBothSizeAndDigestBeforeAcceptance",
+        "seconds": "0.011226"
+      },
+      {
+        "name": "headless_demo",
+        "seconds": "0.010832"
+      },
+      {
+        "name": "project_validate",
+        "seconds": "0.012715"
+      },
+      {
+        "name": "project_run",
+        "seconds": "0.010411"
+      },
+      {
+        "name": "project_cli_roundtrip",
+        "seconds": "0.119066"
+      }
+    ]
+  }
+}

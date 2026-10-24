@@ -1,0 +1,248 @@
+#include "sim/project/document.hpp"
+#include "project_schema.hpp"
+#include <nlohmann/json-schema.hpp>
+#include <nlohmann/json.hpp>
+#include <array>
+#include <fstream>
+#include <limits>
+#include <map>
+#include <set>
+#include <utility>
+
+namespace sim::project {
+namespace {
+using Json = nlohmann::json;
+void require(bool condition, const std::string& message) {
+    if (!condition) { throw Error(ErrorCode::semantic, message); }
+}
+template<class T> T number(const Json& value) {
+    if (!value.is_number_integer() || (!value.is_number_unsigned() && value.get<std::int64_t>() < 0)) {
+        throw Error(ErrorCode::semantic, "Expected nonnegative integer");
+    }
+    const auto raw = value.get<std::uint64_t>();
+    if (raw > static_cast<std::uint64_t>(std::numeric_limits<T>::max())) {
+        throw Error(ErrorCode::semantic, "Integer exceeds destination range");
+    }
+    return static_cast<T>(raw);
+}
+class SchemaErrors : public nlohmann::json_schema::error_handler {
+public:
+    void error(const Json::json_pointer& pointer, const Json&, const std::string& message) override {
+        throw Error(ErrorCode::schema, pointer.to_string() + ": " + message);
+    }
+};
+void check_integer_domain(const Json& json) {
+    // Validator 2.4.0 uses int64 for integer constraints. Reject before it can narrow uint64.
+    if (json.is_number_unsigned() && json.get<std::uint64_t>() >
+        static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max())) {
+        throw Error(ErrorCode::semantic, "Project integers must not exceed INT64_MAX");
+    }
+    if (json.is_structured()) {
+        for (const auto& child : json) { check_integer_domain(child); }
+    }
+}
+void check_schema(const Json& json) {
+    check_integer_domain(json);
+    // Thread-local immutable schema: no shared validator state or external resolution.
+    static thread_local nlohmann::json_schema::json_validator validator{
+        Json::parse(detail::schema_text),
+        [](const nlohmann::json_uri&, Json&) {
+            throw Error(ErrorCode::schema, "External schema resolution is disabled");
+        }};
+    SchemaErrors errors;
+    validator.validate(json, errors);
+}
+void check_version(const Json& json) {
+    if (!json.is_object() || !json.contains("format_version") ||
+        !json["format_version"].is_object() || !json.contains("model_version") || !json.contains("engine")) {
+        throw Error(ErrorCode::schema, "Missing version envelope");
+    }
+    const auto& version = json["format_version"];
+    if (!version.contains("major") || !version.contains("minor")) {
+        throw Error(ErrorCode::schema, "Missing format version fields");
+    }
+    if (version["major"] != 1 || version["minor"] != 0 ||
+        json["model_version"] != 1 || json["engine"] != "discrete-v1") {
+        throw Error(ErrorCode::unsupported_version,
+                    "Unsupported format/model/engine version; explicit migration required");
+    }
+}
+void check_semantics(const Document& doc) {
+    std::set<std::string> ids;
+    const auto register_id = [&ids](const std::string& id) {
+        require(is_uuid_v4(id), "Expected canonical lowercase UUIDv4");
+        require(ids.insert(id).second, "Duplicate entity UUID: " + id);
+    };
+    register_id(doc.project_id);
+    register_id(doc.axis_id);
+    require(doc.rung_ids.size() == doc.simulation.program.rungs.size(), "Rung identity count mismatch");
+    require(doc.assets.size() <= 4096, "Too many assets");
+    // Byte bound is additional to the schema's Unicode code-point limit.
+    require(!doc.title.empty() && doc.title.size() <= 640, "Invalid title length");
+    try { const auto encoded_title = Json(doc.title).dump(); (void)encoded_title; }
+    catch (const Json::exception& error) { throw Error(ErrorCode::invalid_json, error.what()); }
+    for (const auto& id : doc.rung_ids) { register_id(id); }
+    std::map<std::string, std::pair<std::uint64_t, std::string>> catalog;
+    for (const auto& asset : doc.assets) {
+        register_id(asset.id);
+        require(is_sha256(asset.sha256), "Invalid normalized SHA-256");
+        require(asset.byte_size <= max_asset_bytes, "Asset exceeds size limit");
+        require(asset.media_type == "model/gltf+json" || asset.media_type == "model/gltf-binary",
+                "Unsupported asset media type");
+        const auto [it, inserted] = catalog.emplace(asset.sha256, std::pair{asset.byte_size, asset.media_type});
+        require(inserted || it->second == std::pair{asset.byte_size, asset.media_type},
+                "Conflicting metadata for the same content digest");
+    }
+    try { core::validate(doc.simulation); }
+    catch (const std::invalid_argument& error) { throw Error(ErrorCode::semantic, error.what()); }
+}
+Json encode(const Document& doc) {
+    const auto& spec = doc.simulation;
+    Json rungs = Json::array();
+    for (std::size_t i = 0; i < spec.program.rungs.size(); ++i) {
+        const auto& rung = spec.program.rungs[i];
+        Json branches = Json::array();
+        for (const auto& branch : rung.branches) {
+            Json contacts = Json::array();
+            for (const auto& contact : branch) {
+                contacts.push_back({{"bank", contact.bank == core::Bank::input ? "input" : "output"},
+                                    {"signal", contact.signal}, {"normally_closed", contact.normally_closed}});
+            }
+            branches.push_back(std::move(contacts));
+        }
+        rungs.push_back({{"id", doc.rung_ids.at(i)}, {"coil", rung.coil}, {"branches", std::move(branches)}});
+    }
+    Json events = Json::array();
+    for (const auto& event : spec.events) {
+        events.push_back({{"tick", event.tick}, {"sequence", event.sequence},
+                          {"signal", event.signal}, {"value", event.value}});
+    }
+    Json assets = Json::array();
+    for (const auto& asset : doc.assets) {
+        assets.push_back({{"id", asset.id}, {"sha256", asset.sha256},
+                          {"byte_size", asset.byte_size}, {"media_type", asset.media_type}});
+    }
+    return {
+        {"format", "industrial-sim-project"}, {"format_version", {{"major", 1}, {"minor", 0}}},
+        {"model_version", 1}, {"engine", "discrete-v1"}, {"project_id", doc.project_id}, {"title", doc.title},
+        {"simulation", {
+            {"ticks", spec.ticks}, {"tick_period_us", spec.tick_period_us},
+            {"program", {{"input_count", spec.program.input_count}, {"output_count", spec.program.output_count},
+                         {"rungs", std::move(rungs)}}},
+            {"axis", {{"id", doc.axis_id}, {"drive", spec.axis.drive}, {"initial_um", spec.axis.initial_um},
+                      {"maximum_um", spec.axis.maximum_um}, {"travel_um_per_tick", spec.axis.travel_um_per_tick}}},
+            {"events", std::move(events)}}},
+        {"assets", std::move(assets)}
+    };
+}
+Document decode(const Json& json) {
+    Document doc;
+    doc.project_id = json.at("project_id").get<std::string>();
+    doc.title = json.at("title").get<std::string>();
+    const auto& simulation = json.at("simulation");
+    auto& spec = doc.simulation;
+    spec.ticks = number<core::Tick>(simulation.at("ticks"));
+    spec.tick_period_us = number<std::uint64_t>(simulation.at("tick_period_us"));
+    const auto& program = simulation.at("program");
+    spec.program.input_count = number<std::uint32_t>(program.at("input_count"));
+    spec.program.output_count = number<std::uint32_t>(program.at("output_count"));
+    for (const auto& rung_json : program.at("rungs")) {
+        doc.rung_ids.push_back(rung_json.at("id").get<std::string>());
+        core::Rung rung;
+        rung.coil = number<core::Signal>(rung_json.at("coil"));
+        for (const auto& branch_json : rung_json.at("branches")) {
+            core::Branch branch;
+            for (const auto& contact : branch_json) {
+                branch.push_back({contact.at("bank") == "input" ? core::Bank::input : core::Bank::output,
+                                  number<core::Signal>(contact.at("signal")),
+                                  contact.at("normally_closed").get<bool>()});
+            }
+            rung.branches.push_back(std::move(branch));
+        }
+        spec.program.rungs.push_back(std::move(rung));
+    }
+    const auto& axis = simulation.at("axis");
+    doc.axis_id = axis.at("id").get<std::string>();
+    spec.axis = {number<core::Signal>(axis.at("drive")), number<std::int64_t>(axis.at("initial_um")),
+                 number<std::int64_t>(axis.at("maximum_um")), number<std::int64_t>(axis.at("travel_um_per_tick"))};
+    for (const auto& event : simulation.at("events")) {
+        spec.events.push_back({number<core::Tick>(event.at("tick")), number<std::uint64_t>(event.at("sequence")),
+                               number<core::Signal>(event.at("signal")), event.at("value").get<bool>()});
+    }
+    for (const auto& asset : json.at("assets")) {
+        doc.assets.push_back({asset.at("id").get<std::string>(), asset.at("sha256").get<std::string>(),
+                              number<std::uint64_t>(asset.at("byte_size")), asset.at("media_type").get<std::string>()});
+    }
+    return doc;
+}
+}
+Document parse(std::string_view utf8) {
+    if (utf8.size() > max_document_bytes) { throw Error(ErrorCode::limit, "Project JSON exceeds 16 MiB"); }
+    try {
+        std::vector<std::set<std::string>> object_keys;
+        const auto callback = [&object_keys](int depth, Json::parse_event_t event, Json& value) {
+            if (depth > 64) { throw Error(ErrorCode::limit, "Project JSON nesting exceeds 64"); }
+            if (event == Json::parse_event_t::object_start) { object_keys.emplace_back(); }
+            if (event == Json::parse_event_t::key &&
+                !object_keys.back().insert(value.get<std::string>()).second) {
+                throw Error(ErrorCode::invalid_json, "Duplicate JSON object key");
+            }
+            if (event == Json::parse_event_t::object_end) { object_keys.pop_back(); }
+            if (event == Json::parse_event_t::value && value.is_number_float()) {
+                throw Error(ErrorCode::invalid_json, "Project format requires exact integer numbers");
+            }
+            return true;
+        };
+        const auto json = Json::parse(utf8.begin(), utf8.end(), callback);
+        check_version(json);
+        check_schema(json);
+        auto doc = decode(json);
+        check_semantics(doc);
+        return doc;
+    } catch (const Json::exception& error) {
+        throw Error(ErrorCode::invalid_json, error.what());
+    }
+}
+void validate(const Document& document) {
+    check_semantics(document);
+    check_schema(encode(document));
+}
+std::string serialize(const Document& document) {
+    try {
+        check_semantics(document);
+        const auto json = encode(document);
+        check_schema(json);
+        auto text = json.dump(2) + "\n";
+        if (text.size() > max_document_bytes) { throw Error(ErrorCode::limit, "Serialized project exceeds 16 MiB"); }
+        return text;
+    } catch (const Json::exception& error) {
+        throw Error(ErrorCode::invalid_json, error.what());
+    }
+}
+Document load(const std::filesystem::path& path) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file) { throw Error(ErrorCode::io, "Cannot open project file"); }
+    std::string text;
+    std::array<char, 8192> chunk{};
+    while (file) {
+        file.read(chunk.data(), static_cast<std::streamsize>(chunk.size()));
+        const auto count = static_cast<std::size_t>(file.gcount());
+        if (count > max_document_bytes - text.size()) { throw Error(ErrorCode::limit, "Project file exceeds 16 MiB"); }
+        text.append(chunk.data(), count);
+    }
+    if (!file.eof()) { throw Error(ErrorCode::io, "Cannot read project file"); }
+    return parse(text);
+}
+Document new_demo(std::string title) {
+    Document doc;
+    doc.project_id = generate_uuid_v4();
+    doc.axis_id = generate_uuid_v4();
+    doc.title = std::move(title);
+    doc.simulation = core::demo_scenario();
+    for (std::size_t i = 0; i < doc.simulation.program.rungs.size(); ++i) {
+        doc.rung_ids.push_back(generate_uuid_v4());
+    }
+    validate(doc);
+    return doc;
+}
+}

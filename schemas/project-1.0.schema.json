@@ -1,0 +1,264 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Industrial simulation project 1.0",
+  "type": "object",
+  "properties": {
+    "format": {
+      "const": "industrial-sim-project"
+    },
+    "format_version": {
+      "type": "object",
+      "properties": {
+        "major": {
+          "const": 1
+        },
+        "minor": {
+          "const": 0
+        }
+      },
+      "required": [
+        "major",
+        "minor"
+      ],
+      "additionalProperties": false
+    },
+    "model_version": {
+      "const": 1
+    },
+    "engine": {
+      "const": "discrete-v1"
+    },
+    "project_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "simulation": {
+      "type": "object",
+      "properties": {
+        "ticks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "tick_period_us": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "program": {
+          "type": "object",
+          "properties": {
+            "input_count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 256
+            },
+            "output_count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 256
+            },
+            "rungs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "coil": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  "branches": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "bank": {
+                            "enum": [
+                              "input",
+                              "output"
+                            ]
+                          },
+                          "signal": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                          },
+                          "normally_closed": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "bank",
+                          "signal",
+                          "normally_closed"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "minItems": 1,
+                      "maxItems": 4096
+                    },
+                    "minItems": 1,
+                    "maxItems": 4096
+                  }
+                },
+                "required": [
+                  "id",
+                  "coil",
+                  "branches"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0,
+              "maxItems": 256
+            }
+          },
+          "required": [
+            "input_count",
+            "output_count",
+            "rungs"
+          ],
+          "additionalProperties": false
+        },
+        "axis": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "drive": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            },
+            "initial_um": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9223372036854775807
+            },
+            "maximum_um": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9223372036854775807
+            },
+            "travel_um_per_tick": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9223372036854775807
+            }
+          },
+          "required": [
+            "id",
+            "drive",
+            "initial_um",
+            "maximum_um",
+            "travel_um_per_tick"
+          ],
+          "additionalProperties": false
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tick": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 99999
+              },
+              "sequence": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9223372036854775807
+              },
+              "signal": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "value": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "tick",
+              "sequence",
+              "signal",
+              "value"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0,
+          "maxItems": 100000
+        }
+      },
+      "required": [
+        "ticks",
+        "tick_period_us",
+        "program",
+        "axis",
+        "events"
+      ],
+      "additionalProperties": false
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "byte_size": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 268435456
+          },
+          "media_type": {
+            "enum": [
+              "model/gltf+json",
+              "model/gltf-binary"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "sha256",
+          "byte_size",
+          "media_type"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0,
+      "maxItems": 4096
+    }
+  },
+  "required": [
+    "format",
+    "format_version",
+    "model_version",
+    "engine",
+    "project_id",
+    "title",
+    "simulation",
+    "assets"
+  ],
+  "additionalProperties": false
+}

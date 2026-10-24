@@ -1,62 +1,85 @@
 # Plataforma híbrida de simulação industrial
 
-Primeiro incremento real do MVP, criado em 24/10/2026. Aplicação proprietária para Windows x64, offline-first. Este incremento entrega um executável de console; a interface desktop ainda não está implementada.
+MVP incremental proprietário, offline-first, para Windows x64. Versão 0.2.0: núcleo determinístico e documentos de projeto validados. A interface desktop ainda não está implementada.
 
-## O que já existe
+## Implementado
 
-- Monorepo CMake/C++20, presets MSVC Debug/Release e manifesto vcpkg com baseline fixo.
-- Núcleo funcional sem Qt, VTK, arquivos, rede ou relógio de parede.
-- IR Ladder mínimo: contatos NA/NF, séries AND, ramos paralelos OR e bobinas.
-- Passos determinísticos: entradas → Ladder → saídas → eixo linear limitado → snapshot.
-- Escalonador exclusivo com `std::jthread`, fila limitada, cancelamento e resultados `shared_ptr<const RunResult>`.
-- Cache CPU com orçamento, janela LRU, custo de reconstrução, retenção forte limitada e referências fracas.
-- Testes GoogleTest/CTest e cenário de demonstração com saída CSV.
+- C++20, CMake, presets MSVC Debug/Release e manifesto vcpkg fixado.
+- Núcleo funcional independente de Qt, VTK, arquivos, rede e relógio de parede.
+- IR Ladder mínimo: contatos NA/NF, AND/OR e bobinas com atualização simultânea.
+- Eixo linear limitado, snapshots e escalonador dedicado com `std::jthread`.
+- Fila limitada, cancelamento, resultados imutáveis e cache CPU com orçamento + LRU + custo.
+- Documento JSON 1.0, modelo 1 e engine `discrete-v1`; schema Draft-07 embutido.
+- UUIDv4 para projeto, eixo, rungs e assets; geração aleatória pelo Windows CNG.
+- SHA-256 pelo Windows CNG e verificação de tamanho/conteúdo dos buffers de assets.
+- Leitura de arquivos, serialização, validação estrutural/semântica e execução do cenário persistido.
+- GoogleTest/CTest, exemplo reproduzível e comandos de console.
 
-O exemplo energiza uma bobina no tick 1, move o eixo até 25 µm e desenergiza no tick 4. Posições esperadas: `0,10,20,25,25,25,25,25`.
+## Compilar no Windows x64
 
-## Compilar no Windows x64 com MSVC
-
-Pré-requisitos: Visual Studio Build Tools com C++20 e Windows SDK, CMake ≥ 3.25, Ninja, Git e vcpkg. Abra um terminal **x64 Native Tools** e aponte `VCPKG_ROOT` para um checkout vcpkg que contenha o baseline do manifesto. Não é necessário instalar Qt/VTK para este incremento.
-
-Na raiz deste projeto:
+Pré-requisitos: Visual Studio Build Tools com C++20 e Windows SDK, CMake ≥ 3.25, Ninja, Git e vcpkg. Abra **x64 Native Tools** e configure `VCPKG_ROOT` para um checkout que contenha o baseline do manifesto.
 
 ```powershell
 cmake --preset windows-msvc-debug
 cmake --build --preset windows-msvc-debug
 ctest --preset windows-msvc-debug
-./build/windows-msvc-debug/sim_headless.exe
 ```
 
-Troque `debug` por `release` para a segunda configuração. A primeira resolução vcpkg pode baixar dependências; a execução do simulador não utiliza rede. Para builds sem rede, pré-carregue fontes, pacotes e cache binário. O baseline fixo congela o catálogo, não transforma uma máquina nova em ambiente offline.
+Troque `debug` por `release` para a segunda configuração. A primeira resolução pode baixar dependências. O executável não acessa rede; schema e regras estão incorporados. Builds offline exigem dependências e caches previamente disponíveis.
 
-## Verificação com outra ferramenta C++20
+As features `tests;project` fornecem GoogleTest, nlohmann/json e json-schema-validator. Qt/VTK e ZIP não são necessários neste incremento.
 
-Para uma ferramenta já disponível e GoogleTest previamente obtido:
+## Usar o projeto de exemplo
+
+Na raiz do repositório:
 
 ```powershell
-cmake --preset headless-local -DSIM_GTEST_SOURCE_DIR=C:/deps/googletest
+./build/windows-msvc-debug/sim_project.exe validate examples/contactor-axis.json
+./build/windows-msvc-debug/sim_project.exe run examples/contactor-axis.json
+```
+
+O exemplo energiza uma bobina no tick 1, move o eixo até 25 µm e desenergiza no tick 4. Posições esperadas: `0,10,20,25,25,25,25,25`.
+
+Para gerar um novo documento com identidades próprias, `new` escreve JSON UTF-8 na saída padrão. No PowerShell 7:
+
+```powershell
+./build/windows-msvc-debug/sim_project.exe new | Set-Content -Encoding utf8 meu-projeto.json
+./build/windows-msvc-debug/sim_project.exe validate meu-projeto.json
+./build/windows-msvc-debug/sim_project.exe run meu-projeto.json
+```
+
+A redireção pode substituir o arquivo indicado. Ainda não existe salvamento transacional nem pacote ZIP. `validate` confere o documento e os metadados do catálogo; não abre nem valida o conteúdo glTF de arquivos externos. A função `verify_asset` verifica buffers fornecidos pelo futuro carregador.
+
+## Compilar com dependências locais
+
+Para outra ferramenta C++20 no Windows e fontes previamente obtidas:
+
+```powershell
+cmake --preset headless-local -DSIM_GTEST_SOURCE_DIR=C:/deps/googletest -DSIM_JSON_SOURCE_DIR=C:/deps/json -DSIM_JSON_SCHEMA_SOURCE_DIR=C:/deps/json-schema-validator
 cmake --build --preset headless-local
 ctest --preset headless-local
 ```
 
-Essa rota não usa FetchContent nem baixa dependências silenciosamente. Ela verifica o núcleo portátil e não certifica a cadeia MSVC/vcpkg.
+Sem o módulo de projeto, use `-DSIM_BUILD_PROJECT=OFF`; essa configuração mantém núcleo/runtime portáteis e dispensa JSON e Windows CNG. Nenhuma rota baixa dependências silenciosamente durante o build local.
 
 ## Mapa
 
-| Diretório | Responsabilidade |
+| Área | Responsabilidade |
 |---|---|
-| `include/sim/core`, `src/core` | Contratos por valor, IR e evolução determinística |
-| `include/sim/runtime`, `src/runtime` | Thread dedicada, fila, cache CPU |
-| `apps/headless` | Executável de demonstração |
-| `tests` | Comportamento, replay, concorrência e limites |
-| `docs` | RT-351–360, decisões, estado e próximos incrementos |
+| `include/sim/core`, `src/core` | Valores, IR, passos determinísticos |
+| `include/sim/runtime`, `src/runtime` | Thread dedicada, fila e cache CPU |
+| `include/sim/project`, `src/project` | Documentos, validação, identidade e integridade |
+| `schemas`, `examples` | Schema versionado e projeto de demonstração |
+| `apps/headless`, `apps/project` | Demonstração original e CLI de documentos |
+| `tests` | Comportamento, replay, limites, integridade e CLI |
+| `docs` | Contratos, decisões e evidências de validação |
 
-Veja [contrato técnico](docs/technical-contract.md), [decisões](docs/architecture.md) e [verificação](docs/validation.md).
+Leia [formato de projeto](docs/project-format.md), [contrato técnico](docs/technical-contract.md), [arquitetura](docs/architecture.md) e [verificação 0.2](docs/validation-0.2.md).
 
-## Limites deste incremento
+## Escopo e próximos incrementos
 
-A lógica elétrica é booleana; não resolve circuitos analógicos, correntes ou tensões. A mecânica é um eixo cinemático unidirecional em micrômetros inteiros; não há dinâmica de corpos rígidos. O IR não pretende implementar toda a IEC 61131-3. Não há editor, temporizadores, persistência, importação glTF ou visualização 3D ainda.
+A lógica elétrica é booleana e a mecânica é cinemática simplificada. O IR não implementa toda a IEC 61131-3. Ainda não existem editor, temporizadores, pacote ZIP, migração de formatos antigos, importador glTF ou visualização 3D.
 
-Qt Widgets, VTK, minizip-ng, nlohmann/json e Draft-07 permanecem decisões aprovadas. As features `desktop` e `persistence` do manifesto apenas reservam dependências; não criam módulos funcionais. UUIDv4, cálculo/verificação SHA-256 e migrações explícitas serão implementados na camada de projeto/persistência. Nenhum recurso educacional está incluído.
+A próxima etapa é pacote local minizip-ng, limites de expansão, gravação atômica e catálogo integrado ao carregador/cache. Depois virão os workers de assets, shell Qt Widgets e adaptador VTK. Funcionalidades educacionais permanecem fora do escopo.
 
-O código do projeto é proprietário. Dependências conservam suas próprias licenças; a cadeia de distribuição Qt e os avisos de terceiros serão definidos antes de empacotar o desktop.
+O projeto é proprietário; dependências conservam suas licenças. A distribuição desktop e os avisos de terceiros serão preparados antes de empacotar Qt/VTK.

@@ -1,6 +1,6 @@
 {
   "name": "industrial-sim",
-  "version-semver": "0.1.0",
+  "version-semver": "0.2.0",
   "description": "Proprietary offline-first industrial simulation platform",
   "license": "LicenseRef-Proprietary",
   "builtin-baseline": "9eec002df1cd109f8f104cd966a763daf9751489",
@@ -13,10 +13,8 @@
       ]
     },
     "persistence": {
-      "description": "Reserved for the next persistence increment",
+      "description": "Reserved ZIP package dependencies",
       "dependencies": [
-        "nlohmann-json",
-        "json-schema-validator",
         {
           "name": "minizip-ng",
           "default-features": false,
@@ -45,6 +43,13 @@
             "opengl"
           ]
         }
+      ]
+    },
+    "project": {
+      "description": "Versioned project JSON and Draft-07 validation",
+      "dependencies": [
+        "nlohmann-json",
+        "json-schema-validator"
       ]
     }
   }

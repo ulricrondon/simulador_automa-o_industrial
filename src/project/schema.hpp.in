@@ -1,0 +1,5 @@
+#pragma once
+#include <string_view>
+namespace sim::project::detail {
+inline constexpr std::string_view schema_text = R"SIM_SCHEMA(@SIM_PROJECT_SCHEMA@)SIM_SCHEMA";
+}

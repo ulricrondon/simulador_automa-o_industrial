@@ -19,7 +19,7 @@
         "VCPKG_TARGET_TRIPLET": "x64-windows",
         "BUILD_TESTING": "ON",
         "VCPKG_MANIFEST_NO_DEFAULT_FEATURES": "ON",
-        "VCPKG_MANIFEST_FEATURES": "tests"
+        "VCPKG_MANIFEST_FEATURES": "tests;project"
       },
       "condition": {
         "type": "equals",

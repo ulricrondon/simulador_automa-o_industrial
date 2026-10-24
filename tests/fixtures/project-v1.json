@@ -1,0 +1,56 @@
+{
+  "format": "industrial-sim-project",
+  "format_version": {
+    "major": 1,
+    "minor": 0
+  },
+  "model_version": 1,
+  "engine": "discrete-v1",
+  "project_id": "d53c2a81-681a-4e38-9bd7-2e329936ee47",
+  "title": "Contator e eixo linear",
+  "simulation": {
+    "ticks": 8,
+    "tick_period_us": 1000,
+    "program": {
+      "input_count": 1,
+      "output_count": 1,
+      "rungs": [
+        {
+          "id": "09b84a1f-2420-41f0-82ca-de2da6143e5e",
+          "coil": 0,
+          "branches": [
+            [
+              {
+                "bank": "input",
+                "signal": 0,
+                "normally_closed": false
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    "axis": {
+      "id": "349d647d-610c-4c7a-9699-d3bfad5e9685",
+      "drive": 0,
+      "initial_um": 0,
+      "maximum_um": 25,
+      "travel_um_per_tick": 10
+    },
+    "events": [
+      {
+        "tick": 1,
+        "sequence": 0,
+        "signal": 0,
+        "value": true
+      },
+      {
+        "tick": 4,
+        "sequence": 1,
+        "signal": 0,
+        "value": false
+      }
+    ]
+  },
+  "assets": []
+}
