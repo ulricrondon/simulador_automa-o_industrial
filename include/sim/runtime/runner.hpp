@@ -19,11 +19,14 @@ public:
     Runner(const Runner&) = delete;
     Runner& operator=(const Runner&) = delete;
     std::future<ResultPtr> submit(core::RunSpec spec);
+    std::future<ResultPtr> submit_controlled(core::RunSpec spec, std::vector<core::ControlAction> actions);
 private:
     struct Job {
         core::RunSpec spec;
         std::promise<ResultPtr> promise;
+        std::optional<std::vector<core::ControlAction>> actions;
     };
+    std::future<ResultPtr> enqueue(Job job);
     void work(std::stop_token stop);
     BoundedQueue<Job> jobs_;
     std::jthread thread_; // Last: referenced state exists before thread starts.

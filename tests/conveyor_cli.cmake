@@ -1,0 +1,18 @@
+execute_process(COMMAND "${CLI}" new-conveyor OUTPUT_FILE "${OUT}" RESULT_VARIABLE result)
+if(NOT result EQUAL 0)
+  message(FATAL_ERROR "Cannot create conveyor document")
+endif()
+execute_process(COMMAND "${CLI}" validate "${OUT}" OUTPUT_VARIABLE info RESULT_VARIABLE result)
+if(NOT result EQUAL 0 OR NOT info MATCHES "conveyor-v1")
+  message(FATAL_ERROR "Cannot load conveyor document")
+endif()
+execute_process(COMMAND "${CLI}" run "${OUT}" OUTPUT_VARIABLE trace RESULT_VARIABLE result)
+if(NOT result EQUAL 0 OR NOT trace MATCHES "7,8000,20" OR NOT trace MATCHES "sensor,0,HIGH" OR NOT trace MATCHES "EVENTS")
+  message(FATAL_ERROR "Conveyor closed-loop trace mismatch: ${trace}")
+endif()
+execute_process(COMMAND "${CLI}" control "${OUT}" step step pause step resume step stop step
+                OUTPUT_VARIABLE controlled RESULT_VARIABLE result)
+if(NOT result EQUAL 0 OR NOT controlled MATCHES "CONTROL state=stopped next_tick=3 position_um=20 motor=LOW"
+   OR NOT controlled MATCHES "paused" OR NOT controlled MATCHES "resumed")
+  message(FATAL_ERROR "Controlled conveyor trace mismatch: ${controlled}")
+endif()

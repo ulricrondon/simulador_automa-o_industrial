@@ -1,0 +1,480 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Industrial simulation conveyor project 1.1",
+  "type": "object",
+  "properties": {
+    "format": {
+      "const": "industrial-sim-project"
+    },
+    "format_version": {
+      "type": "object",
+      "properties": {
+        "major": {
+          "const": 1
+        },
+        "minor": {
+          "const": 1
+        }
+      },
+      "required": [
+        "major",
+        "minor"
+      ],
+      "additionalProperties": false
+    },
+    "model_version": {
+      "const": 2
+    },
+    "engine": {
+      "const": "conveyor-v1"
+    },
+    "project_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "simulation": {
+      "type": "object",
+      "properties": {
+        "ticks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "tick_period_us": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "program": {
+          "type": "object",
+          "properties": {
+            "input_count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 256
+            },
+            "output_count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 256
+            },
+            "rungs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "coil": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  "branches": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "bank": {
+                            "enum": [
+                              "input",
+                              "output"
+                            ]
+                          },
+                          "signal": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                          },
+                          "normally_closed": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "bank",
+                          "signal",
+                          "normally_closed"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "minItems": 1,
+                      "maxItems": 4096
+                    },
+                    "minItems": 1,
+                    "maxItems": 4096
+                  }
+                },
+                "required": [
+                  "id",
+                  "coil",
+                  "branches"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0,
+              "maxItems": 256
+            }
+          },
+          "required": [
+            "input_count",
+            "output_count",
+            "rungs"
+          ],
+          "additionalProperties": false
+        },
+        "axis": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "drive": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            },
+            "initial_um": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9223372036854775807
+            },
+            "maximum_um": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9223372036854775807
+            },
+            "travel_um_per_tick": {
+              "const": 0
+            }
+          },
+          "required": [
+            "id",
+            "drive",
+            "initial_um",
+            "maximum_um",
+            "travel_um_per_tick"
+          ],
+          "additionalProperties": false
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tick": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 99999
+              },
+              "sequence": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9223372036854775807
+              },
+              "signal": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "value": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "tick",
+              "sequence",
+              "signal",
+              "value"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0,
+          "maxItems": 0
+        },
+        "conveyor": {
+          "type": "object",
+          "properties": {
+            "axis_ref": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "plc_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "motor_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "piece_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "sensor_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "command_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "speed_um_per_s": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9223372036854775807
+            },
+            "piece_length_um": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9223372036854775807
+            },
+            "sensor_begin_um": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9223372036854775807
+            },
+            "sensor_end_um": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9223372036854775807
+            },
+            "initial_command": {
+              "enum": [
+                "LOW",
+                "HIGH",
+                "UNDEFINED",
+                "FAULT"
+              ]
+            },
+            "motor_power": {
+              "enum": [
+                "LOW",
+                "HIGH",
+                "UNDEFINED",
+                "FAULT"
+              ]
+            },
+            "sensor_power": {
+              "enum": [
+                "LOW",
+                "HIGH",
+                "UNDEFINED",
+                "FAULT"
+              ]
+            },
+            "connections": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "object",
+                    "properties": {
+                      "entity": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                      },
+                      "port": {
+                        "enum": [
+                          "command",
+                          "sensor",
+                          "plc_input",
+                          "plc_output",
+                          "motor_command"
+                        ]
+                      },
+                      "index": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      }
+                    },
+                    "required": [
+                      "entity",
+                      "port",
+                      "index"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "target": {
+                    "type": "object",
+                    "properties": {
+                      "entity": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                      },
+                      "port": {
+                        "enum": [
+                          "command",
+                          "sensor",
+                          "plc_input",
+                          "plc_output",
+                          "motor_command"
+                        ]
+                      },
+                      "index": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      }
+                    },
+                    "required": [
+                      "entity",
+                      "port",
+                      "index"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "timing": {
+                    "enum": [
+                      "same_scan",
+                      "previous_step"
+                    ]
+                  }
+                },
+                "required": [
+                  "source",
+                  "target",
+                  "timing"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "events": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "tick": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 99999
+                  },
+                  "sequence": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9223372036854775807
+                  },
+                  "target": {
+                    "enum": [
+                      "command",
+                      "motor_power",
+                      "sensor_power"
+                    ]
+                  },
+                  "entity": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "value": {
+                    "enum": [
+                      "LOW",
+                      "HIGH",
+                      "UNDEFINED",
+                      "FAULT"
+                    ]
+                  }
+                },
+                "required": [
+                  "tick",
+                  "sequence",
+                  "target",
+                  "entity",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              "maxItems": 100000
+            }
+          },
+          "required": [
+            "axis_ref",
+            "plc_id",
+            "motor_id",
+            "piece_id",
+            "sensor_id",
+            "command_id",
+            "speed_um_per_s",
+            "piece_length_um",
+            "sensor_begin_um",
+            "sensor_end_um",
+            "initial_command",
+            "motor_power",
+            "sensor_power",
+            "connections",
+            "events"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "ticks",
+        "tick_period_us",
+        "program",
+        "axis",
+        "events",
+        "conveyor"
+      ],
+      "additionalProperties": false
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "byte_size": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 268435456
+          },
+          "media_type": {
+            "enum": [
+              "model/gltf+json",
+              "model/gltf-binary"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "sha256",
+          "byte_size",
+          "media_type"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0,
+      "maxItems": 4096
+    }
+  },
+  "required": [
+    "format",
+    "format_version",
+    "model_version",
+    "engine",
+    "project_id",
+    "title",
+    "simulation",
+    "assets"
+  ],
+  "additionalProperties": false
+}

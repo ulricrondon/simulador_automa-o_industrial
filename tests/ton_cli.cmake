@@ -1,0 +1,8 @@
+execute_process(COMMAND "${CLI}" validate "${INPUT}" OUTPUT_VARIABLE info RESULT_VARIABLE result)
+if(NOT result EQUAL 0 OR NOT info MATCHES "conveyor-ton-v1")
+  message(FATAL_ERROR "TON profile validation failed: ${info}")
+endif()
+execute_process(COMMAND "${CLI}" run "${INPUT}" OUTPUT_VARIABLE trace RESULT_VARIABLE result)
+if(NOT result EQUAL 0 OR NOT trace MATCHES "TIMER,3,0,2000,HIGH" OR NOT trace MATCHES "7,8000,20")
+  message(FATAL_ERROR "TON trace failed: ${trace}")
+endif()

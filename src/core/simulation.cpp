@@ -1,4 +1,5 @@
 #include "sim/core/simulation.hpp"
+#include "sim/core/conveyor.hpp"
 #include <algorithm>
 #include <limits>
 #include <set>
@@ -26,6 +27,7 @@ void validate(const RunSpec& spec) {
     std::set<Signal> coils;
     std::size_t contacts = 0;
     for (const auto& rung : p.rungs) {
+        require(!rung.ton_us || *rung.ton_us <= static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()), "TON preset exceeds INT64_MAX");
         require(rung.coil < p.output_count, "coil out of range");
         require(coils.insert(rung.coil).second, "multiple writers for coil");
         require(!rung.branches.empty() && rung.branches.size() <= max_contacts, "invalid branches");
@@ -52,16 +54,23 @@ void validate(const RunSpec& spec) {
         require(event.signal < p.input_count, "event signal out of range");
         require(sequences.insert(event.sequence).second, "duplicate event sequence");
     }
+    if (spec.conveyor) { validate_conveyor(spec); }
+}
+std::int64_t advance_linear(std::int64_t position, std::int64_t maximum, std::int64_t distance) {
+    require(position >= 0 && position <= maximum && distance >= 0, "Invalid linear motion");
+    return position + std::min(distance, maximum - position);
 }
 RunResult simulate(const RunSpec& spec, std::stop_token stop) {
     if (stop.stop_requested()) { throw RunCancelled{}; }
     validate(spec);
+    if (spec.conveyor) { return simulate_conveyor(spec, stop); }
     auto events = spec.events;
     std::sort(events.begin(), events.end(), [](const auto& a, const auto& b) {
         return std::tie(a.tick, a.sequence) < std::tie(b.tick, b.sequence);
     });
     std::vector<std::uint8_t> inputs(spec.program.input_count, 0);
     std::vector<std::uint8_t> outputs(spec.program.output_count, 0);
+    std::vector<TimerState> timers(spec.program.output_count);
     auto position = spec.axis.initial_um;
     RunResult result;
     result.trace.reserve(static_cast<std::size_t>(spec.ticks));
@@ -73,25 +82,19 @@ RunResult simulate(const RunSpec& spec, std::stop_token stop) {
             inputs[event.signal] = static_cast<std::uint8_t>(event.value);
         }
         // All rungs read the previous output image; rung order cannot change results.
-        std::vector<std::uint8_t> next_outputs(spec.program.output_count, 0);
-        for (const auto& rung : spec.program.rungs) {
-            bool powered = false;
-            for (const auto& branch : rung.branches) {
-                bool closed = true;
-                for (const auto& contact : branch) {
-                    const bool value = (contact.bank == Bank::input ? inputs : outputs)[contact.signal] != 0;
-                    closed = closed && (contact.normally_closed ? !value : value);
-                }
-                powered = powered || closed;
-            }
-            next_outputs[rung.coil] = static_cast<std::uint8_t>(powered);
+        std::vector<PlcInput> typed_inputs;
+        std::vector<PlcOutput> typed_outputs;
+        for (auto value : inputs) { typed_inputs.push_back({static_cast<DigitalState>(value)}); }
+        for (auto value : outputs) { typed_outputs.push_back({static_cast<DigitalState>(value)}); }
+        const auto next_outputs = scan_ladder(spec.program, typed_inputs, typed_outputs, timers, spec.tick_period_us);
+        for (std::size_t i = 0; i < outputs.size(); ++i) {
+            outputs[i] = static_cast<std::uint8_t>(next_outputs[i].state);
         }
-        outputs = std::move(next_outputs);
         if (outputs[spec.axis.drive] != 0) {
             // Difference first: avoid signed overflow near INT64_MAX.
-            position += std::min(spec.axis.travel_um_per_tick, spec.axis.maximum_um - position);
+            position = advance_linear(position, spec.axis.maximum_um, spec.axis.travel_um_per_tick);
         }
-        result.trace.push_back({tick, (tick + 1) * spec.tick_period_us, inputs, outputs, position});
+        result.trace.push_back({tick, (tick + 1) * spec.tick_period_us, inputs, outputs, position, std::nullopt, has_timers(spec.program) ? timers : std::vector<TimerState>{}});
     }
     return result;
 }

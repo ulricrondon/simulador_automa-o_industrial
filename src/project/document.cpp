@@ -1,5 +1,7 @@
 #include "sim/project/document.hpp"
 #include "project_schema.hpp"
+#include "conveyor_codec.hpp"
+#include "sim/core/conveyor.hpp"
 #include <nlohmann/json-schema.hpp>
 #include <nlohmann/json.hpp>
 #include <array>
@@ -49,8 +51,18 @@ void check_schema(const Json& json) {
         [](const nlohmann::json_uri&, Json&) {
             throw Error(ErrorCode::schema, "External schema resolution is disabled");
         }};
+    static thread_local nlohmann::json_schema::json_validator conveyor_validator{
+        Json::parse(detail::schema_conveyor_text),
+        [](const nlohmann::json_uri&, Json&) {
+            throw Error(ErrorCode::schema, "External schema resolution is disabled");
+        }};
+    static thread_local nlohmann::json_schema::json_validator ton_validator{
+        Json::parse(detail::schema_ton_text),
+        [](const nlohmann::json_uri&, Json&) { throw Error(ErrorCode::schema, "External schema resolution is disabled"); }};
     SchemaErrors errors;
-    validator.validate(json, errors);
+    if (json.value("engine", std::string{}) == "conveyor-ton-v1") { ton_validator.validate(json, errors); return; }
+    if (json.value("engine", std::string{}) == "conveyor-v1") { conveyor_validator.validate(json, errors); }
+    else { validator.validate(json, errors); }
 }
 void check_version(const Json& json) {
     if (!json.is_object() || !json.contains("format_version") ||
@@ -61,13 +73,18 @@ void check_version(const Json& json) {
     if (!version.contains("major") || !version.contains("minor")) {
         throw Error(ErrorCode::schema, "Missing format version fields");
     }
-    if (version["major"] != 1 || version["minor"] != 0 ||
-        json["model_version"] != 1 || json["engine"] != "discrete-v1") {
+    const bool legacy = version["major"] == 1 && version["minor"] == 0 &&
+                        json["model_version"] == 1 && json["engine"] == "discrete-v1";
+    const bool conveyor = version["major"] == 1 && version["minor"] == 1 &&
+                          json["model_version"] == 2 && json["engine"] == "conveyor-v1";
+    const bool ton = version["major"] == 1 && version["minor"] == 2 && json["model_version"] == 3 && json["engine"] == "conveyor-ton-v1";
+    if (!legacy && !conveyor && !ton) {
         throw Error(ErrorCode::unsupported_version,
                     "Unsupported format/model/engine version; explicit migration required");
     }
 }
 void check_semantics(const Document& doc) {
+    require(!core::has_timers(doc.simulation.program) || doc.simulation.conveyor.has_value(), "Persisted TON requires conveyor profile");
     std::set<std::string> ids;
     const auto register_id = [&ids](const std::string& id) {
         require(is_uuid_v4(id), "Expected canonical lowercase UUIDv4");
@@ -75,6 +92,13 @@ void check_semantics(const Document& doc) {
     };
     register_id(doc.project_id);
     register_id(doc.axis_id);
+    require(doc.conveyor_ids.has_value() == doc.simulation.conveyor.has_value(), "Conveyor identities/model mismatch");
+    if (doc.conveyor_ids) {
+        const auto& ids = *doc.conveyor_ids;
+        for (const auto* id : {&ids.plc_id, &ids.motor_id, &ids.piece_id, &ids.sensor_id, &ids.command_id}) {
+            register_id(*id);
+        }
+    }
     require(doc.rung_ids.size() == doc.simulation.program.rungs.size(), "Rung identity count mismatch");
     require(doc.assets.size() <= 4096, "Too many assets");
     // Byte bound is additional to the schema's Unicode code-point limit.
@@ -111,6 +135,7 @@ Json encode(const Document& doc) {
             branches.push_back(std::move(contacts));
         }
         rungs.push_back({{"id", doc.rung_ids.at(i)}, {"coil", rung.coil}, {"branches", std::move(branches)}});
+        if (rung.ton_us) { rungs.back()["ton_us"] = *rung.ton_us; }
     }
     Json events = Json::array();
     for (const auto& event : spec.events) {
@@ -122,7 +147,7 @@ Json encode(const Document& doc) {
         assets.push_back({{"id", asset.id}, {"sha256", asset.sha256},
                           {"byte_size", asset.byte_size}, {"media_type", asset.media_type}});
     }
-    return {
+    Json json = {
         {"format", "industrial-sim-project"}, {"format_version", {{"major", 1}, {"minor", 0}}},
         {"model_version", 1}, {"engine", "discrete-v1"}, {"project_id", doc.project_id}, {"title", doc.title},
         {"simulation", {
@@ -134,6 +159,16 @@ Json encode(const Document& doc) {
             {"events", std::move(events)}}},
         {"assets", std::move(assets)}
     };
+    if (spec.conveyor) {
+        json["format_version"]["minor"] = 1;
+        json["model_version"] = 2;
+        json["engine"] = "conveyor-v1";
+        json["simulation"]["conveyor"] = detail::encode_conveyor(doc);
+    }
+    if (core::has_timers(spec.program)) {
+        json["format_version"]["minor"] = 2; json["model_version"] = 3; json["engine"] = "conveyor-ton-v1";
+    }
+    return json;
 }
 Document decode(const Json& json) {
     Document doc;
@@ -150,6 +185,7 @@ Document decode(const Json& json) {
         doc.rung_ids.push_back(rung_json.at("id").get<std::string>());
         core::Rung rung;
         rung.coil = number<core::Signal>(rung_json.at("coil"));
+        if (rung_json.contains("ton_us")) { rung.ton_us = number<std::uint64_t>(rung_json.at("ton_us")); }
         for (const auto& branch_json : rung_json.at("branches")) {
             core::Branch branch;
             for (const auto& contact : branch_json) {
@@ -169,6 +205,7 @@ Document decode(const Json& json) {
         spec.events.push_back({number<core::Tick>(event.at("tick")), number<std::uint64_t>(event.at("sequence")),
                                number<core::Signal>(event.at("signal")), event.at("value").get<bool>()});
     }
+    if (simulation.contains("conveyor")) { detail::decode_conveyor(simulation.at("conveyor"), doc); }
     for (const auto& asset : json.at("assets")) {
         doc.assets.push_back({asset.at("id").get<std::string>(), asset.at("sha256").get<std::string>(),
                               number<std::uint64_t>(asset.at("byte_size")), asset.at("media_type").get<std::string>()});
@@ -242,6 +279,14 @@ Document new_demo(std::string title) {
     for (std::size_t i = 0; i < doc.simulation.program.rungs.size(); ++i) {
         doc.rung_ids.push_back(generate_uuid_v4());
     }
+    validate(doc);
+    return doc;
+}
+Document new_conveyor_demo(std::string title) {
+    auto doc = new_demo(std::move(title));
+    doc.simulation = core::conveyor_scenario();
+    doc.conveyor_ids = ConveyorIdentities{generate_uuid_v4(), generate_uuid_v4(), generate_uuid_v4(),
+                                           generate_uuid_v4(), generate_uuid_v4()};
     validate(doc);
     return doc;
 }

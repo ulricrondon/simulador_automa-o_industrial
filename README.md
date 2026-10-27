@@ -76,10 +76,20 @@ Sem o módulo de projeto, use `-DSIM_BUILD_PROJECT=OFF`; essa configuração man
 
 Leia [formato de projeto](docs/project-format.md), [contrato técnico](docs/technical-contract.md), [arquitetura](docs/architecture.md) e [verificação 0.2](docs/validation-0.2.md).
 
+## Esteira funcional headless
+
+O cenário integrado conecta PLC/Ladder, acionamento, esteira, peça e sensor fotoelétrico, com estados LOW/HIGH/UNDEFINED/FAULT e realimentação no próximo passo simulado. O JSON anterior permanece suportado; a esteira usa o perfil 1.1/modelo 2.
+
+```powershell
+./build/conveyor-debug/sim_project.exe validate examples/conveyor.json
+./build/conveyor-debug/sim_project.exe run examples/conveyor.json
+./build/conveyor-debug/sim_project.exe control examples/conveyor.json step step pause step resume step stop step
+```
+
+Veja [relatório da entrega, contrato funcional e validação](docs/conveyor.md). A execução e os controles usam o Runner dedicado existente; os testes verificam também o replay determinístico e a persistência.
+
 ## Escopo e próximos incrementos
 
-A lógica elétrica é booleana e a mecânica é cinemática simplificada. O IR não implementa toda a IEC 61131-3. Ainda não existem editor, temporizadores, pacote ZIP, migração de formatos antigos, importador glTF ou visualização 3D.
+A mecânica permanece cinemática simplificada, com uma peça e movimento positivo. O IR não implementa toda a IEC 61131-3. Ainda não existem temporizadores, editor ou visualização 3D. O próximo avanço recomendado é TON em tempo simulado, com regressão do cenário de esteira. Funcionalidades educacionais permanecem fora do escopo.
 
-A próxima etapa é pacote local minizip-ng, limites de expansão, gravação atômica e catálogo integrado ao carregador/cache. Depois virão os workers de assets, shell Qt Widgets e adaptador VTK. Funcionalidades educacionais permanecem fora do escopo.
-
-O projeto é proprietário; dependências conservam suas licenças. A distribuição desktop e os avisos de terceiros serão preparados antes de empacotar Qt/VTK.
+O projeto é proprietário; dependências conservam suas licenças. O desenvolvimento desta entrega foi exclusivamente local; o usuário administra commits e publicação.

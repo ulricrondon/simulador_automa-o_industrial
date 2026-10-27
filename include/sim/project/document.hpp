@@ -28,6 +28,10 @@ struct AssetRecord {
     std::string media_type;
     bool operator==(const AssetRecord&) const = default;
 };
+struct ConveyorIdentities {
+    std::string plc_id, motor_id, piece_id, sensor_id, command_id;
+    bool operator==(const ConveyorIdentities&) const = default;
+};
 struct Document {
     std::string project_id;
     std::string title;
@@ -35,12 +39,14 @@ struct Document {
     std::vector<std::string> rung_ids;
     core::RunSpec simulation;
     std::vector<AssetRecord> assets;
+    std::optional<ConveyorIdentities> conveyor_ids;
 };
-// Format 1.0, model 1, engine discrete-v1. No implicit migrations.
+// Legacy 1.0/discrete-v1 and conveyor 1.1/model 2/conveyor-v1. No implicit migrations.
 Document parse(std::string_view utf8);
 std::string serialize(const Document& document);
 Document load(const std::filesystem::path& path);
 Document new_demo(std::string title);
+Document new_conveyor_demo(std::string title);
 void validate(const Document& document);
 bool is_uuid_v4(std::string_view text) noexcept;
 bool is_sha256(std::string_view text) noexcept;
