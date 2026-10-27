@@ -15,6 +15,7 @@ public:
     Tick next_tick() const noexcept { return tick_; }
     std::int64_t position_um() const noexcept { return position_; }
     DigitalState motor_state() const noexcept { return live_.motor_state; }
+    const std::vector<CounterState>& counters() const noexcept { return counters_; }
     const RunResult& result() const noexcept { return result_; }
 private:
     void record(Phase phase, TransitionKind kind, std::uint32_t index,
@@ -27,6 +28,7 @@ private:
     std::int64_t remainder_{};
     ConveyorSnapshot live_;
     std::vector<TimerState> timers_;
+    std::vector<CounterState> counters_;
     RunResult result_;
 };
 void validate_conveyor(const RunSpec& spec);

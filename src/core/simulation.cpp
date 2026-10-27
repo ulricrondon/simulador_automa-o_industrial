@@ -28,6 +28,12 @@ void validate(const RunSpec& spec) {
     std::size_t contacts = 0;
     for (const auto& rung : p.rungs) {
         require(!rung.ton_us || *rung.ton_us <= static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()), "TON preset exceeds INT64_MAX");
+        if (rung.ctu) {
+            require(!rung.ton_us && rung.ctu->pv >= 0, "Invalid CTU preset or TON/CTU combination");
+            const auto& reset = rung.ctu->reset;
+            require(reset.bank == Bank::input || reset.bank == Bank::output, "Invalid CTU reset bank");
+            require(reset.signal < (reset.bank == Bank::input ? p.input_count : p.output_count), "CTU reset out of range");
+        }
         require(rung.coil < p.output_count, "coil out of range");
         require(coils.insert(rung.coil).second, "multiple writers for coil");
         require(!rung.branches.empty() && rung.branches.size() <= max_contacts, "invalid branches");
@@ -71,6 +77,7 @@ RunResult simulate(const RunSpec& spec, std::stop_token stop) {
     std::vector<std::uint8_t> inputs(spec.program.input_count, 0);
     std::vector<std::uint8_t> outputs(spec.program.output_count, 0);
     std::vector<TimerState> timers(spec.program.output_count);
+    std::vector<CounterState> counters(spec.program.output_count);
     auto position = spec.axis.initial_um;
     RunResult result;
     result.trace.reserve(static_cast<std::size_t>(spec.ticks));
@@ -86,15 +93,17 @@ RunResult simulate(const RunSpec& spec, std::stop_token stop) {
         std::vector<PlcOutput> typed_outputs;
         for (auto value : inputs) { typed_inputs.push_back({static_cast<DigitalState>(value)}); }
         for (auto value : outputs) { typed_outputs.push_back({static_cast<DigitalState>(value)}); }
-        const auto next_outputs = scan_ladder(spec.program, typed_inputs, typed_outputs, timers, spec.tick_period_us);
+        const auto previous_counters = counters;
+        const auto next_outputs = scan_ladder(spec.program, typed_inputs, typed_outputs, timers, counters, spec.tick_period_us);
+        record_counter_changes(spec.program, previous_counters, counters, tick, tick * spec.tick_period_us, result.counter_events);
         for (std::size_t i = 0; i < outputs.size(); ++i) {
             outputs[i] = static_cast<std::uint8_t>(next_outputs[i].state);
         }
-        if (outputs[spec.axis.drive] != 0) {
+        if (outputs[spec.axis.drive] == static_cast<std::uint8_t>(DigitalState::HIGH)) {
             // Difference first: avoid signed overflow near INT64_MAX.
             position = advance_linear(position, spec.axis.maximum_um, spec.axis.travel_um_per_tick);
         }
-        result.trace.push_back({tick, (tick + 1) * spec.tick_period_us, inputs, outputs, position, std::nullopt, has_timers(spec.program) ? timers : std::vector<TimerState>{}});
+        result.trace.push_back({tick, (tick + 1) * spec.tick_period_us, inputs, outputs, position, std::nullopt, has_timers(spec.program) ? timers : std::vector<TimerState>{}, has_counters(spec.program) ? counters : std::vector<CounterState>{}});
     }
     return result;
 }

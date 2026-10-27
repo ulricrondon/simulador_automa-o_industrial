@@ -6,7 +6,15 @@
 #include <string_view>
 
 namespace {
+void print_counters(const sim::core::RunResult& result) {
+    for (const auto& e : result.counter_events) {
+        std::cout << "COUNTER," << e.tick << ',' << e.time_us << ',' << e.coil << ','
+                  << e.state.cv << ',' << name(e.state.q) << ',' << e.state.armed << ','
+                  << (e.stopped ? "stop" : "scan") << '\n';
+    }
+}
 void print_result(const sim::core::RunResult& result, bool conveyor) {
+    print_counters(result);
     if (!conveyor) {
         std::cout << "tick,time_us,input_0,output_0,position_um\n";
         for (const auto& s : result.trace) {
@@ -64,7 +72,7 @@ int wmain(int argc, wchar_t** argv) {
         if (argc == 3 && (std::wstring_view(argv[1]) == L"validate" || std::wstring_view(argv[1]) == L"run")) {
             const auto doc = sim::project::load(std::filesystem::path(argv[2]));
             if (std::wstring_view(argv[1]) == L"validate") {
-                std::cout << "Valid project " << doc.project_id << (doc.simulation.conveyor
+                std::cout << "Valid project " << doc.project_id << (sim::core::has_counters(doc.simulation.program) ? "; format 1.3; model 4; ladder-ctu-v1\n" : doc.simulation.conveyor
                     ? (sim::core::has_timers(doc.simulation.program) ? "; format 1.2; model 3; conveyor-ton-v1\n" : "; format 1.1; model 2; conveyor-v1\n") : "; format 1.0; model 1; discrete-v1\n");
                 return 0;
             }

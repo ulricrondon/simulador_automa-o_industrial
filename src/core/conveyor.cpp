@@ -84,6 +84,7 @@ ConveyorSession::ConveyorSession(RunSpec spec) : spec_(std::move(spec)) {
     live_.plc_inputs.resize(spec_.program.input_count);
     live_.plc_outputs.resize(spec_.program.output_count);
     timers_.resize(spec_.program.output_count);
+    counters_.resize(spec_.program.output_count);
     live_.sensor_state = detect(c, live_.sensor_power, position_, position_);
     live_.sampled_sensor = live_.sensor_state;
     result_.trace.reserve(static_cast<std::size_t>(spec_.ticks));
@@ -127,7 +128,9 @@ bool ConveyorSession::step() {
     }
     live_.plc_inputs = std::move(inputs);
     // 3. All rungs read previous output image, then publish coils together.
-    auto outputs = scan_ladder(spec_.program, live_.plc_inputs, live_.plc_outputs, timers_, spec_.tick_period_us);
+    const auto previous_counters = counters_;
+    auto outputs = scan_ladder(spec_.program, live_.plc_inputs, live_.plc_outputs, timers_, counters_, spec_.tick_period_us);
+    record_counter_changes(spec_.program, previous_counters, counters_, tick_, tick_ * spec_.tick_period_us, result_.counter_events);
     for (std::size_t i = 0; i < outputs.size(); ++i) {
         if (outputs[i] != live_.plc_outputs[i]) {
             record(Phase::ladder, TransitionKind::plc_output, static_cast<Signal>(i), outputs[i].state);
@@ -164,6 +167,7 @@ bool ConveyorSession::step() {
     for (const auto& output : live_.plc_outputs) { snapshot.outputs.push_back(static_cast<std::uint8_t>(output.state)); }
     snapshot.conveyor = live_;
     if (has_timers(spec_.program)) { snapshot.timers = timers_; }
+    if (has_counters(spec_.program)) { snapshot.counters = counters_; }
     result_.trace.push_back(std::move(snapshot));
     ++tick_;
     if (tick_ == spec_.ticks) { state_ = SessionState::completed; }
@@ -189,6 +193,9 @@ void ConveyorSession::stop() {
             record(Phase::control, TransitionKind::plc_output, static_cast<Signal>(i), DigitalState::LOW);
         }
     }
+    const auto previous_counters = counters_;
+    std::fill(counters_.begin(), counters_.end(), CounterState{});
+    record_counter_changes(spec_.program, previous_counters, counters_, tick_, tick_ * spec_.tick_period_us, result_.counter_events, true);
     std::fill(timers_.begin(), timers_.end(), TimerState{});
     live_.motor_command.state = DigitalState::LOW;
     const auto motor = drive_state(live_.motor_power, live_.motor_command);

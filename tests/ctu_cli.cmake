@@ -1,0 +1,13 @@
+execute_process(COMMAND "${CLI}" validate "${INPUT}" OUTPUT_VARIABLE info RESULT_VARIABLE result)
+if(NOT result EQUAL 0 OR NOT info MATCHES "ladder-ctu-v1")
+  message(FATAL_ERROR "CTU profile failed: ${info}")
+endif()
+execute_process(COMMAND "${CLI}" run "${INPUT}" OUTPUT_VARIABLE trace RESULT_VARIABLE result)
+if(NOT result EQUAL 0 OR NOT trace MATCHES "COUNTER,5,5000,1,3,HIGH" OR NOT trace MATCHES "COUNTER,10,10000,1,0,LOW")
+  message(FATAL_ERROR "CTU pulse trace failed: ${trace}")
+endif()
+execute_process(COMMAND "${CLI}" control "${SENSOR}" step step pause step resume step step stop
+                OUTPUT_VARIABLE trace RESULT_VARIABLE result)
+if(NOT result EQUAL 0 OR NOT trace MATCHES "COUNTER,4,4000,1,0,LOW,0,stop" OR NOT trace MATCHES "state=stopped")
+  message(FATAL_ERROR "CTU control failed: ${trace}")
+endif()

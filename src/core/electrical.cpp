@@ -1,6 +1,7 @@
 #include "sim/core/simulation.hpp"
 #include <stdexcept>
 #include <algorithm>
+#include <set>
 
 namespace sim::core {
 namespace {
@@ -33,7 +34,7 @@ DigitalState drive_state(PowerSupply supply, DriveCommand command) {
 }
 std::vector<PlcOutput> scan_ladder(const Program& program, const std::vector<PlcInput>& inputs,
                                  const std::vector<PlcOutput>& previous_outputs) {
-    if (has_timers(program)) { throw std::invalid_argument("Timed Ladder requires persistent timer state"); }
+    if (has_timers(program) || has_counters(program)) { throw std::invalid_argument("Timed Ladder requires persistent timer state"); }
     std::vector<TimerState> timers(program.output_count);
     return scan_ladder(program, inputs, previous_outputs, timers, 1);
 }
@@ -42,6 +43,22 @@ bool has_timers(const Program& program) {
 }
 std::vector<PlcOutput> scan_ladder(const Program& program, const std::vector<PlcInput>& inputs,
     const std::vector<PlcOutput>& previous_outputs, std::vector<TimerState>& timers, std::uint64_t period_us) {
+    if (has_counters(program)) { throw std::invalid_argument("CTU requires persistent counter state"); }
+    std::vector<CounterState> counters(program.output_count);
+    return scan_ladder(program, inputs, previous_outputs, timers, counters, period_us);
+}
+std::vector<PlcOutput> scan_ladder(const Program& program, const std::vector<PlcInput>& inputs,
+    const std::vector<PlcOutput>& previous_outputs, std::vector<TimerState>& timers,
+    std::vector<CounterState>& counters, std::uint64_t period_us) {
+    // Reject duplicate instances before any state mutation, including direct scanner calls.
+    std::set<Signal> writers;
+    for (const auto& rung : program.rungs) {
+        if (rung.coil >= program.output_count || !writers.insert(rung.coil).second ||
+            (rung.ctu && (rung.ton_us || rung.ctu->pv < 0))) {
+            throw std::invalid_argument("Invalid or duplicate stateful rung");
+        }
+    }
+    if (counters.size() != program.output_count) { throw std::invalid_argument("Counter image size mismatch"); }
     if (period_us == 0 || timers.size() != program.output_count) {
         throw std::invalid_argument("Invalid timer state or period");
     }
@@ -73,6 +90,15 @@ std::vector<PlcOutput> scan_ladder(const Program& program, const std::vector<Plc
                 timer.q = timer.elapsed_us >= preset ? DigitalState::HIGH : DigitalState::LOW;
             }
             powered = timer.q;
+        }
+        if (rung.ctu) {
+            const auto& r = rung.ctu->reset;
+            if (r.bank != Bank::input && r.bank != Bank::output) { throw std::invalid_argument("Invalid reset bank"); }
+            auto reset = r.bank == Bank::input ? inputs.at(r.signal).state : previous_outputs.at(r.signal).state;
+            if (r.normally_closed) { reset = invert(reset); }
+            auto& counter = counters.at(rung.coil);
+            counter = update_ctu(counter, powered, reset, rung.ctu->pv);
+            powered = counter.q;
         }
         outputs.at(rung.coil).state = powered;
     }

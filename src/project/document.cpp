@@ -59,7 +59,11 @@ void check_schema(const Json& json) {
     static thread_local nlohmann::json_schema::json_validator ton_validator{
         Json::parse(detail::schema_ton_text),
         [](const nlohmann::json_uri&, Json&) { throw Error(ErrorCode::schema, "External schema resolution is disabled"); }};
+    static thread_local nlohmann::json_schema::json_validator ctu_validator{
+        Json::parse(detail::schema_ctu_text),
+        [](const nlohmann::json_uri&, Json&) { throw Error(ErrorCode::schema, "External schema resolution is disabled"); }};
     SchemaErrors errors;
+    if (json.value("engine", std::string{}) == "ladder-ctu-v1") { ctu_validator.validate(json, errors); return; }
     if (json.value("engine", std::string{}) == "conveyor-ton-v1") { ton_validator.validate(json, errors); return; }
     if (json.value("engine", std::string{}) == "conveyor-v1") { conveyor_validator.validate(json, errors); }
     else { validator.validate(json, errors); }
@@ -78,13 +82,14 @@ void check_version(const Json& json) {
     const bool conveyor = version["major"] == 1 && version["minor"] == 1 &&
                           json["model_version"] == 2 && json["engine"] == "conveyor-v1";
     const bool ton = version["major"] == 1 && version["minor"] == 2 && json["model_version"] == 3 && json["engine"] == "conveyor-ton-v1";
-    if (!legacy && !conveyor && !ton) {
+    const bool ctu = version["major"] == 1 && version["minor"] == 3 && json["model_version"] == 4 && json["engine"] == "ladder-ctu-v1";
+    if (!legacy && !conveyor && !ton && !ctu) {
         throw Error(ErrorCode::unsupported_version,
                     "Unsupported format/model/engine version; explicit migration required");
     }
 }
 void check_semantics(const Document& doc) {
-    require(!core::has_timers(doc.simulation.program) || doc.simulation.conveyor.has_value(), "Persisted TON requires conveyor profile");
+    require(!core::has_timers(doc.simulation.program) || doc.simulation.conveyor.has_value() || core::has_counters(doc.simulation.program), "Persisted TON requires conveyor profile");
     std::set<std::string> ids;
     const auto register_id = [&ids](const std::string& id) {
         require(is_uuid_v4(id), "Expected canonical lowercase UUIDv4");
@@ -136,6 +141,12 @@ Json encode(const Document& doc) {
         }
         rungs.push_back({{"id", doc.rung_ids.at(i)}, {"coil", rung.coil}, {"branches", std::move(branches)}});
         if (rung.ton_us) { rungs.back()["ton_us"] = *rung.ton_us; }
+        if (rung.ctu) {
+            const auto& r = rung.ctu->reset;
+            rungs.back()["ctu"] = {{"pv", rung.ctu->pv},
+                {"reset", {{"bank", r.bank == core::Bank::input ? "input" : "output"},
+                           {"signal", r.signal}, {"normally_closed", r.normally_closed}}}};
+        }
     }
     Json events = Json::array();
     for (const auto& event : spec.events) {
@@ -168,6 +179,9 @@ Json encode(const Document& doc) {
     if (core::has_timers(spec.program)) {
         json["format_version"]["minor"] = 2; json["model_version"] = 3; json["engine"] = "conveyor-ton-v1";
     }
+    if (core::has_counters(spec.program)) {
+        json["format_version"]["minor"] = 3; json["model_version"] = 4; json["engine"] = "ladder-ctu-v1";
+    }
     return json;
 }
 Document decode(const Json& json) {
@@ -186,6 +200,13 @@ Document decode(const Json& json) {
         core::Rung rung;
         rung.coil = number<core::Signal>(rung_json.at("coil"));
         if (rung_json.contains("ton_us")) { rung.ton_us = number<std::uint64_t>(rung_json.at("ton_us")); }
+        if (rung_json.contains("ctu")) {
+            const auto& c = rung_json.at("ctu");
+            const auto& r = c.at("reset");
+            rung.ctu = core::CounterConfig{number<std::int64_t>(c.at("pv")),
+                {r.at("bank") == "input" ? core::Bank::input : core::Bank::output,
+                 number<core::Signal>(r.at("signal")), r.at("normally_closed").get<bool>()}};
+        }
         for (const auto& branch_json : rung_json.at("branches")) {
             core::Branch branch;
             for (const auto& contact : branch_json) {

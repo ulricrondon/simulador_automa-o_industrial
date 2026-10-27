@@ -93,3 +93,8 @@ Veja [relatório da entrega, contrato funcional e validação](docs/conveyor.md)
 A mecânica permanece cinemática simplificada, com uma peça e movimento positivo. O IR não implementa toda a IEC 61131-3. Ainda não existem temporizadores, editor ou visualização 3D. O próximo avanço recomendado é TON em tempo simulado, com regressão do cenário de esteira. Funcionalidades educacionais permanecem fora do escopo.
 
 O projeto é proprietário; dependências conservam suas licenças. O desenvolvimento desta entrega foi exclusivamente local; o usuário administra commits e publicação.
+
+
+## CTU
+
+Contador por borda LOW para HIGH integrado ao Ladder, com reset conservador, CV inteiro e eventos deterministas. Veja [semantica, exemplos e validacao](docs/ctu.md). Exemplos: examples/ctu-pulses.json e examples/conveyor-ctu.json.
