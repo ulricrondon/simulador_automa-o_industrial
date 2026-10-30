@@ -50,6 +50,7 @@ std::vector<PlcOutput> scan_ladder(const Program& program, const std::vector<Plc
 std::vector<PlcOutput> scan_ladder(const Program& program, const std::vector<PlcInput>& inputs,
     const std::vector<PlcOutput>& previous_outputs, std::vector<TimerState>& timers,
     std::vector<CounterState>& counters, std::uint64_t period_us) {
+    validate_comparisons(program);
     // Reject duplicate instances before any state mutation, including direct scanner calls.
     std::set<Signal> writers;
     for (const auto& rung : program.rungs) {
@@ -65,12 +66,17 @@ std::vector<PlcOutput> scan_ladder(const Program& program, const std::vector<Plc
     if (inputs.size() != program.input_count || previous_outputs.size() != program.output_count) {
         throw std::invalid_argument("PLC image size mismatch");
     }
+    const auto previous_counters = counters; // Coherent read-only image for every rung.
     std::vector<PlcOutput> outputs(program.output_count);
     for (const auto& rung : program.rungs) {
         auto powered = DigitalState::LOW;
         for (const auto& branch : rung.branches) {
             auto closed = DigitalState::HIGH;
             for (const auto& contact : branch) {
+                if (contact.comparison) {
+                    closed = series(closed, evaluate_comparison(previous_counters.at(contact.comparison->counter.coil), *contact.comparison));
+                    continue;
+                }
                 if (contact.bank != Bank::input && contact.bank != Bank::output) {
                     throw std::invalid_argument("Invalid PLC bank");
                 }

@@ -1,6 +1,7 @@
 #pragma once
 #include "sim/core/conveyor_model.hpp"
 #include <optional>
+#include <string_view>
 #include <cstdint>
 #include <stop_token>
 #include <stdexcept>
@@ -10,10 +11,19 @@ namespace sim::core {
 using Tick = std::uint64_t;
 using Signal = std::uint32_t;
 enum class Bank { input, output };
+enum class ComparisonOp { equal, not_equal, less, less_equal, greater, greater_equal };
+struct CounterReference { Signal coil{}; };
+struct CvComparison {
+    CounterReference counter;
+    ComparisonOp op{ComparisonOp::equal};
+    std::int64_t constant{};
+};
 struct Contact {
     Bank bank{Bank::input};
     Signal signal{};
     bool normally_closed{};
+    std::optional<CvComparison> comparison{};
+    static Contact compare(CvComparison value) { return {Bank::input, 0, false, value}; }
 };
 struct CounterConfig {
     std::int64_t pv{};
@@ -72,6 +82,10 @@ struct CounterEvent {
     bool operator==(const CounterEvent&) const = default;
 };
 CounterState update_ctu(CounterState state, DigitalState cu, DigitalState reset, std::int64_t pv);
+DigitalState evaluate_comparison(const CounterState& counter, const CvComparison& comparison);
+std::string_view comparison_name(ComparisonOp op);
+bool has_comparisons(const Program& program);
+void validate_comparisons(const Program& program);
 bool has_counters(const Program& program);
 bool has_timers(const Program& program);
 struct Snapshot {

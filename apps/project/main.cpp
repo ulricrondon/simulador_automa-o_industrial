@@ -72,7 +72,7 @@ int wmain(int argc, wchar_t** argv) {
         if (argc == 3 && (std::wstring_view(argv[1]) == L"validate" || std::wstring_view(argv[1]) == L"run")) {
             const auto doc = sim::project::load(std::filesystem::path(argv[2]));
             if (std::wstring_view(argv[1]) == L"validate") {
-                std::cout << "Valid project " << doc.project_id << (sim::core::has_counters(doc.simulation.program) ? "; format 1.3; model 4; ladder-ctu-v1\n" : doc.simulation.conveyor
+                std::cout << "Valid project " << doc.project_id << (sim::core::has_comparisons(doc.simulation.program) ? "; format 1.4; model 5; ladder-compare-v1\n" : sim::core::has_counters(doc.simulation.program) ? "; format 1.3; model 4; ladder-ctu-v1\n" : doc.simulation.conveyor
                     ? (sim::core::has_timers(doc.simulation.program) ? "; format 1.2; model 3; conveyor-ton-v1\n" : "; format 1.1; model 2; conveyor-v1\n") : "; format 1.0; model 1; discrete-v1\n");
                 return 0;
             }

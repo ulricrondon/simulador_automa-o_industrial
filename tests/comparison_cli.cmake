@@ -1,0 +1,8 @@
+execute_process(COMMAND "${CLI}" validate "${INPUT}" OUTPUT_VARIABLE info RESULT_VARIABLE result)
+if(NOT result EQUAL 0 OR NOT info MATCHES "ladder-compare-v1")
+  message(FATAL_ERROR "Comparison profile failed: ${info}")
+endif()
+execute_process(COMMAND "${CLI}" run "${INPUT}" OUTPUT_VARIABLE trace RESULT_VARIABLE result)
+if(NOT result EQUAL 0 OR NOT trace MATCHES "COUNTER,5,5000,1,3,LOW" OR NOT trace MATCHES "5,6000,1,0,0" OR NOT trace MATCHES "6,7000,1,1,10")
+  message(FATAL_ERROR "CV comparison timing failed: ${trace}")
+endif()

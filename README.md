@@ -90,7 +90,7 @@ Veja [relatório da entrega, contrato funcional e validação](docs/conveyor.md)
 
 ## Escopo e próximos incrementos
 
-A mecânica permanece cinemática simplificada, com uma peça e movimento positivo. O IR não implementa toda a IEC 61131-3. Ainda não existem temporizadores, editor ou visualização 3D. O próximo avanço recomendado é TON em tempo simulado, com regressão do cenário de esteira. Funcionalidades educacionais permanecem fora do escopo.
+A mecânica permanece cinemática simplificada, com uma peça e movimento positivo. TON, CTU e comparações inteiras de CV estão implementados. O IR não implementa toda a IEC 61131-3; editor e visualização 3D permanecem pendentes. O próximo avanço recomendado é consolidar uma sequência industrial com os blocos existentes e replay completo. Funcionalidades educacionais permanecem fora do escopo.
 
 O projeto é proprietário; dependências conservam suas licenças. O desenvolvimento desta entrega foi exclusivamente local; o usuário administra commits e publicação.
 
@@ -98,3 +98,8 @@ O projeto é proprietário; dependências conservam suas licenças. O desenvolvi
 ## CTU
 
 Contador por borda LOW para HIGH integrado ao Ladder, com reset conservador, CV inteiro e eventos deterministas. Veja [semantica, exemplos e validacao](docs/ctu.md). Exemplos: examples/ctu-pulses.json e examples/conveyor-ctu.json.
+
+
+## Comparadores de CV
+
+Os seis comparadores inteiros de CTU.CV com constantes estao implementados. Consulte [contrato, exemplo e validacao](docs/comparisons.md) e examples/cv-compare-pulses.json. A leitura usa a imagem anterior dos contadores, sem dependencia da ordem dos rungs.

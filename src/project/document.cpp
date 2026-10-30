@@ -5,6 +5,7 @@
 #include <nlohmann/json-schema.hpp>
 #include <nlohmann/json.hpp>
 #include <array>
+#include <algorithm>
 #include <fstream>
 #include <limits>
 #include <map>
@@ -62,7 +63,11 @@ void check_schema(const Json& json) {
     static thread_local nlohmann::json_schema::json_validator ctu_validator{
         Json::parse(detail::schema_ctu_text),
         [](const nlohmann::json_uri&, Json&) { throw Error(ErrorCode::schema, "External schema resolution is disabled"); }};
+    static thread_local nlohmann::json_schema::json_validator compare_validator{
+        Json::parse(detail::schema_compare_text),
+        [](const nlohmann::json_uri&, Json&) { throw Error(ErrorCode::schema, "External schema resolution is disabled"); }};
     SchemaErrors errors;
+    if (json.value("engine", std::string{}) == "ladder-compare-v1") { compare_validator.validate(json, errors); return; }
     if (json.value("engine", std::string{}) == "ladder-ctu-v1") { ctu_validator.validate(json, errors); return; }
     if (json.value("engine", std::string{}) == "conveyor-ton-v1") { ton_validator.validate(json, errors); return; }
     if (json.value("engine", std::string{}) == "conveyor-v1") { conveyor_validator.validate(json, errors); }
@@ -83,7 +88,8 @@ void check_version(const Json& json) {
                           json["model_version"] == 2 && json["engine"] == "conveyor-v1";
     const bool ton = version["major"] == 1 && version["minor"] == 2 && json["model_version"] == 3 && json["engine"] == "conveyor-ton-v1";
     const bool ctu = version["major"] == 1 && version["minor"] == 3 && json["model_version"] == 4 && json["engine"] == "ladder-ctu-v1";
-    if (!legacy && !conveyor && !ton && !ctu) {
+    const bool compare = version["major"] == 1 && version["minor"] == 4 && json["model_version"] == 5 && json["engine"] == "ladder-compare-v1";
+    if (!legacy && !conveyor && !ton && !ctu && !compare) {
         throw Error(ErrorCode::unsupported_version,
                     "Unsupported format/model/engine version; explicit migration required");
     }
@@ -134,6 +140,16 @@ Json encode(const Document& doc) {
         for (const auto& branch : rung.branches) {
             Json contacts = Json::array();
             for (const auto& contact : branch) {
+                if (contact.comparison) {
+                    const auto& c = *contact.comparison;
+                    const auto it = std::find_if(spec.program.rungs.begin(), spec.program.rungs.end(),
+                        [&](const auto& r) { return r.coil == c.counter.coil && r.ctu.has_value(); });
+                    require(it != spec.program.rungs.end(), "Comparison target is not a CTU");
+                    const auto index = static_cast<std::size_t>(std::distance(spec.program.rungs.begin(), it));
+                    contacts.push_back({{"compare", {{"counter_ref", doc.rung_ids.at(index)},
+                        {"operator", std::string(core::comparison_name(c.op))}, {"constant", c.constant}}}});
+                    continue;
+                }
                 contacts.push_back({{"bank", contact.bank == core::Bank::input ? "input" : "output"},
                                     {"signal", contact.signal}, {"normally_closed", contact.normally_closed}});
             }
@@ -182,6 +198,9 @@ Json encode(const Document& doc) {
     if (core::has_counters(spec.program)) {
         json["format_version"]["minor"] = 3; json["model_version"] = 4; json["engine"] = "ladder-ctu-v1";
     }
+    if (core::has_comparisons(spec.program)) {
+        json["format_version"]["minor"] = 4; json["model_version"] = 5; json["engine"] = "ladder-compare-v1";
+    }
     return json;
 }
 Document decode(const Json& json) {
@@ -210,6 +229,29 @@ Document decode(const Json& json) {
         for (const auto& branch_json : rung_json.at("branches")) {
             core::Branch branch;
             for (const auto& contact : branch_json) {
+                if (contact.contains("compare")) {
+                    const auto& c = contact.at("compare");
+                    std::optional<core::Signal> target;
+                    for (const auto& candidate : program.at("rungs")) {
+                        if (candidate.at("id") == c.at("counter_ref")) {
+                            require(!target && candidate.contains("ctu"), "Ambiguous or incompatible CTU reference");
+                            target = number<core::Signal>(candidate.at("coil"));
+                        }
+                    }
+                    require(target.has_value(), "Unknown CTU reference");
+                    const auto op_text = c.at("operator").get<std::string>();
+                    std::optional<core::ComparisonOp> op;
+                    for (auto candidate : {core::ComparisonOp::equal, core::ComparisonOp::not_equal,
+                        core::ComparisonOp::less, core::ComparisonOp::less_equal, core::ComparisonOp::greater,
+                        core::ComparisonOp::greater_equal}) {
+                        if (core::comparison_name(candidate) == op_text) { op = candidate; }
+                    }
+                    require(op.has_value(), "Unknown comparison operator");
+                    // check_integer_domain/schema/parser already reject overflow and non-integers.
+                    require(c.at("constant").is_number_integer(), "Comparison requires an int64 constant");
+                    branch.push_back(core::Contact::compare({{*target}, *op, c.at("constant").get<std::int64_t>()}));
+                    continue;
+                }
                 branch.push_back({contact.at("bank") == "input" ? core::Bank::input : core::Bank::output,
                                   number<core::Signal>(contact.at("signal")),
                                   contact.at("normally_closed").get<bool>()});

@@ -1,0 +1,144 @@
+{
+  "format": "industrial-sim-project",
+  "format_version": {
+    "major": 1,
+    "minor": 4
+  },
+  "model_version": 5,
+  "engine": "ladder-compare-v1",
+  "project_id": "d53c2a81-681a-4e38-9bd7-2e329936ee47",
+  "title": "CV comparison - third pulse",
+  "simulation": {
+    "ticks": 15,
+    "tick_period_us": 1000,
+    "program": {
+      "input_count": 3,
+      "output_count": 2,
+      "rungs": [
+        {
+          "id": "09b84a1f-2420-41f0-82ca-de2da6143e5e",
+          "coil": 0,
+          "branches": [
+            [
+              {
+                "bank": "input",
+                "signal": 0,
+                "normally_closed": false
+              },
+              {
+                "compare": {
+                  "counter_ref": "b0000001-0000-4000-8000-000000000001",
+                  "operator": ">=",
+                  "constant": 3
+                }
+              }
+            ]
+          ]
+        },
+        {
+          "id": "b0000001-0000-4000-8000-000000000001",
+          "coil": 1,
+          "branches": [
+            [
+              {
+                "bank": "input",
+                "signal": 1,
+                "normally_closed": false
+              }
+            ]
+          ],
+          "ctu": {
+            "pv": 99,
+            "reset": {
+              "bank": "input",
+              "signal": 2,
+              "normally_closed": false
+            }
+          }
+        }
+      ]
+    },
+    "axis": {
+      "id": "349d647d-610c-4c7a-9699-d3bfad5e9685",
+      "drive": 0,
+      "initial_um": 0,
+      "maximum_um": 1000,
+      "travel_um_per_tick": 10
+    },
+    "events": [
+      {
+        "tick": 0,
+        "sequence": 0,
+        "signal": 0,
+        "value": true
+      },
+      {
+        "tick": 1,
+        "sequence": 1,
+        "signal": 1,
+        "value": true
+      },
+      {
+        "tick": 2,
+        "sequence": 2,
+        "signal": 1,
+        "value": false
+      },
+      {
+        "tick": 3,
+        "sequence": 3,
+        "signal": 1,
+        "value": true
+      },
+      {
+        "tick": 4,
+        "sequence": 4,
+        "signal": 1,
+        "value": false
+      },
+      {
+        "tick": 5,
+        "sequence": 5,
+        "signal": 1,
+        "value": true
+      },
+      {
+        "tick": 7,
+        "sequence": 6,
+        "signal": 1,
+        "value": false
+      },
+      {
+        "tick": 8,
+        "sequence": 7,
+        "signal": 1,
+        "value": true
+      },
+      {
+        "tick": 10,
+        "sequence": 8,
+        "signal": 2,
+        "value": true
+      },
+      {
+        "tick": 11,
+        "sequence": 9,
+        "signal": 2,
+        "value": false
+      },
+      {
+        "tick": 12,
+        "sequence": 10,
+        "signal": 1,
+        "value": false
+      },
+      {
+        "tick": 13,
+        "sequence": 11,
+        "signal": 1,
+        "value": true
+      }
+    ]
+  },
+  "assets": []
+}

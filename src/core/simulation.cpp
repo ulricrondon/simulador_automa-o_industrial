@@ -21,6 +21,7 @@ void validate(const RunSpec& spec) {
     require(spec.tick_period_us <= std::numeric_limits<std::uint64_t>::max() / spec.ticks,
             "simulation duration overflows");
     const auto& p = spec.program;
+    validate_comparisons(p);
     require(p.input_count > 0 && p.input_count <= max_signals, "invalid input count");
     require(p.output_count > 0 && p.output_count <= max_signals, "invalid output count");
     require(p.rungs.size() <= p.output_count, "too many rungs");
@@ -42,6 +43,7 @@ void validate(const RunSpec& spec) {
             contacts += branch.size();
             require(contacts <= max_contacts, "too many contacts");
             for (const auto& contact : branch) {
+                if (contact.comparison) { continue; }
                 require(contact.bank == Bank::input || contact.bank == Bank::output, "invalid signal bank");
                 require(contact.signal < (contact.bank == Bank::input ? p.input_count : p.output_count),
                         "contact out of range");
