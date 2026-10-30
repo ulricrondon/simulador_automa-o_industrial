@@ -6,6 +6,7 @@
 #include <limits>
 #include <random>
 #include <type_traits>
+#include <utility>
 
 namespace {
 using namespace sim::core;
@@ -314,6 +315,20 @@ TEST(ConveyorControl, DedicatedRunnerPreservesControlBoundariesAndRecoversFromIn
     EXPECT_EQ(*runner.submit(spec).get(),simulate(spec));
     EXPECT_THROW(runner.submit_controlled(demo_scenario(),{}),std::invalid_argument);
     EXPECT_THROW(runner.submit_controlled(spec,{static_cast<A>(99)}),std::invalid_argument);
+}
+TEST(ConveyorControl, ConsumingResultTransfersCompleteHistoryWithoutCopying) {
+    static_assert(std::is_same_v<decltype(std::declval<ConveyorSession&>().result()),const RunResult&>);
+    static_assert(std::is_same_v<decltype(std::declval<const ConveyorSession&>().result()),const RunResult&>);
+    static_assert(std::is_same_v<decltype(std::declval<ConveyorSession>().result()),RunResult>);
+    const auto spec=conveyor_scenario();
+    ConveyorSession session(spec);
+    while(session.step()) {}
+    const auto expected=session.result();
+    const auto* storage=session.result().trace.data();
+    const auto moved=std::move(session).result();
+    EXPECT_EQ(moved.trace.data(),storage);
+    EXPECT_EQ(moved,expected);
+    EXPECT_EQ(moved,simulate(spec));
 }
 
 }

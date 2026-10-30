@@ -1,11 +1,35 @@
 #include "sim/project/document.hpp"
 #include "sim/runtime/runner.hpp"
 #include "sim/core/conveyor.hpp"
+#include "sim/core/replay.hpp"
 #include <array>
+#include <algorithm>
 #include <iostream>
 #include <string_view>
 
 namespace {
+void inspect(const sim::project::Document& doc, const sim::core::RunResult& result) {
+    for(std::size_t i=0;i<doc.rung_ids.size();++i) {
+        std::cout << "ENTITY,rung[" << doc.simulation.program.rungs[i].coil << "],"
+                  << doc.rung_ids[i] << '\n';
+    }
+    std::cout << "ENTITY,axis," << doc.axis_id << '\n';
+    if(doc.conveyor_ids) {
+        std::cout << "ENTITY,motor," << doc.conveyor_ids->motor_id << '\n'
+                  << "ENTITY,sensor," << doc.conveyor_ids->sensor_id << '\n';
+    }
+    const auto count=std::min<std::size_t>(64,result.trace.size());
+    std::vector<sim::core::CounterState> previous(doc.simulation.program.output_count);
+    for(std::size_t i=0;i<count;++i) {
+        const auto& s=result.trace[i];
+        for(const auto& v:sim::core::snapshot_values(s))
+            std::cout << "STATE," << s.tick << ',' << s.time_us << ',' << v.entity << ',' << v.variable << ',' << v.value << '\n';
+        for(const auto& v:sim::core::comparison_values(doc.simulation.program,previous))
+            std::cout << "EVAL," << s.tick << ',' << s.tick*doc.simulation.tick_period_us << ',' << v.entity << ',' << v.variable << ',' << v.value << '\n';
+        if(!s.counters.empty()) { previous=s.counters; }
+    }
+    if(count<result.trace.size()) { std::cout << "INSPECT truncated after 64 snapshots\n"; }
+}
 void print_counters(const sim::core::RunResult& result) {
     for (const auto& e : result.counter_events) {
         std::cout << "COUNTER," << e.tick << ',' << e.time_us << ',' << e.coil << ','
@@ -69,6 +93,22 @@ int wmain(int argc, wchar_t** argv) {
             std::cout << sim::project::serialize(doc);
             return 0;
         }
+        if (argc == 3 && (std::wstring_view(argv[1]) == L"replay" || std::wstring_view(argv[1]) == L"inspect")) {
+            const auto doc=sim::project::load(std::filesystem::path(argv[2]));
+            sim::runtime::Runner runner;
+            const auto reference=runner.submit(doc.simulation).get();
+            if(std::wstring_view(argv[1]) == L"inspect") { inspect(doc,*reference); return 0; }
+            const auto replay=runner.submit(doc.simulation).get();
+            if(const auto d=sim::core::compare_runs(*reference,*replay)) {
+                std::cout << "DIVERGENCE tick=" << d->tick << " entity=" << d->entity
+                          << " variable=" << d->variable << " expected=" << d->expected << " actual=" << d->actual << '\n';
+                return 3;
+            }
+            std::cout << "REPLAY identical ticks=" << reference->trace.size()
+                      << " events=" << reference->events.size()
+                      << " counter_events=" << reference->counter_events.size() << '\n';
+            return 0;
+        }
         if (argc == 3 && (std::wstring_view(argv[1]) == L"validate" || std::wstring_view(argv[1]) == L"run")) {
             const auto doc = sim::project::load(std::filesystem::path(argv[2]));
             if (std::wstring_view(argv[1]) == L"validate") {
@@ -104,7 +144,7 @@ int wmain(int argc, wchar_t** argv) {
             return 0;
         }
         std::cerr << "Usage: sim_project new | new-conveyor | validate <json> | run <json> | "
-                     "control <json> step|pause|resume|stop ...\n";
+                     "control <json> step|pause|resume|stop ... | replay <json> | inspect <json>\n";
         return 2;
     } catch (const sim::project::Error& error) {
         std::cerr << "Project error [" << static_cast<int>(error.code()) << "]: " << error.what() << '\n';

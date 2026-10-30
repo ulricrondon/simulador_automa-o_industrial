@@ -1,0 +1,21 @@
+foreach(INPUT IN ITEMS "${PHYSICAL}" "${PULSES}")
+  execute_process(COMMAND "${CLI}" validate "${INPUT}" RESULT_VARIABLE result OUTPUT_VARIABLE info)
+  if(NOT result EQUAL 0)
+    message(FATAL_ERROR "Reference scenario validation failed: ${info}")
+  endif()
+  execute_process(COMMAND "${CLI}" replay "${INPUT}" RESULT_VARIABLE result OUTPUT_VARIABLE info)
+  if(NOT result EQUAL 0 OR NOT info MATCHES "REPLAY identical ticks=")
+    message(FATAL_ERROR "Replay failed: ${info}")
+  endif()
+endforeach()
+execute_process(COMMAND "${CLI}" inspect "${PHYSICAL}" RESULT_VARIABLE result OUTPUT_VARIABLE info)
+if(NOT result EQUAL 0 OR NOT info MATCHES "STATE,5,6000,ctu\\[1\\],cv,1"
+   OR NOT info MATCHES "EVAL,6,6000,rung\\[0\\].*result,LOW"
+   OR NOT info MATCHES "STATE,3,4000,ton\\[0\\],elapsed_us,2000")
+  message(FATAL_ERROR "Physical inspection failed: ${info}")
+endif()
+execute_process(COMMAND "${CLI}" inspect "${PULSES}" RESULT_VARIABLE result OUTPUT_VARIABLE info)
+if(NOT result EQUAL 0 OR NOT info MATCHES "STATE,7,8000,ton\\[0\\],q,HIGH"
+   OR NOT info MATCHES "STATE,8,9000,ctu\\[1\\],cv,4")
+  message(FATAL_ERROR "Pulse inspection failed: ${info}")
+endif()

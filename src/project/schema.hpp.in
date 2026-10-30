@@ -1,9 +1,9 @@
 #pragma once
 #include <string_view>
 namespace sim::project::detail {
-inline constexpr std::string_view schema_compare_text = R"SIM_SCHEMA(@SIM_COMPARE_SCHEMA@)SIM_SCHEMA";
-inline constexpr std::string_view schema_ctu_text = R"SIM_SCHEMA(@SIM_CTU_SCHEMA@)SIM_SCHEMA";
-inline constexpr std::string_view schema_ton_text = R"SIM_SCHEMA(@SIM_TON_SCHEMA@)SIM_SCHEMA";
-inline constexpr std::string_view schema_text = R"SIM_SCHEMA(@SIM_PROJECT_SCHEMA@)SIM_SCHEMA";
-inline constexpr std::string_view schema_conveyor_text = R"SIM_SCHEMA(@SIM_CONVEYOR_SCHEMA@)SIM_SCHEMA";
+inline constexpr std::string_view schema_compare_text = @SIM_COMPARE_SCHEMA@;
+inline constexpr std::string_view schema_ctu_text = @SIM_CTU_SCHEMA@;
+inline constexpr std::string_view schema_ton_text = @SIM_TON_SCHEMA@;
+inline constexpr std::string_view schema_text = @SIM_PROJECT_SCHEMA@;
+inline constexpr std::string_view schema_conveyor_text = @SIM_CONVEYOR_SCHEMA@;
 }

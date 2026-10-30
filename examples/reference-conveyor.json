@@ -1,0 +1,161 @@
+{
+  "format": "industrial-sim-project",
+  "format_version": {
+    "major": 1,
+    "minor": 4
+  },
+  "model_version": 5,
+  "engine": "ladder-compare-v1",
+  "project_id": "d53c2a81-681a-4e38-9bd7-2e329936ee47",
+  "title": "Reference - one physical passage",
+  "simulation": {
+    "ticks": 12,
+    "tick_period_us": 1000,
+    "program": {
+      "input_count": 2,
+      "output_count": 2,
+      "rungs": [
+        {
+          "id": "09b84a1f-2420-41f0-82ca-de2da6143e5e",
+          "coil": 0,
+          "branches": [
+            [
+              {
+                "bank": "input",
+                "signal": 0,
+                "normally_closed": false
+              },
+              {
+                "bank": "input",
+                "signal": 1,
+                "normally_closed": true
+              },
+              {
+                "compare": {
+                  "counter_ref": "b0000001-0000-4000-8000-000000000001",
+                  "operator": "<",
+                  "constant": 1
+                }
+              }
+            ],
+            [
+              {
+                "bank": "input",
+                "signal": 0,
+                "normally_closed": false
+              },
+              {
+                "bank": "output",
+                "signal": 0,
+                "normally_closed": false
+              },
+              {
+                "compare": {
+                  "counter_ref": "b0000001-0000-4000-8000-000000000001",
+                  "operator": "<",
+                  "constant": 1
+                }
+              }
+            ]
+          ],
+          "ton_us": 2000
+        },
+        {
+          "id": "b0000001-0000-4000-8000-000000000001",
+          "coil": 1,
+          "branches": [
+            [
+              {
+                "bank": "input",
+                "signal": 1,
+                "normally_closed": false
+              }
+            ]
+          ],
+          "ctu": {
+            "pv": 1,
+            "reset": {
+              "bank": "input",
+              "signal": 0,
+              "normally_closed": true
+            }
+          }
+        }
+      ]
+    },
+    "axis": {
+      "id": "349d647d-610c-4c7a-9699-d3bfad5e9685",
+      "drive": 0,
+      "initial_um": 0,
+      "maximum_um": 100,
+      "travel_um_per_tick": 0
+    },
+    "events": [],
+    "conveyor": {
+      "axis_ref": "349d647d-610c-4c7a-9699-d3bfad5e9685",
+      "plc_id": "a0000001-0000-4000-8000-000000000001",
+      "motor_id": "a0000002-0000-4000-8000-000000000002",
+      "piece_id": "a0000003-0000-4000-8000-000000000003",
+      "sensor_id": "a0000004-0000-4000-8000-000000000004",
+      "command_id": "a0000005-0000-4000-8000-000000000005",
+      "speed_um_per_s": 10000,
+      "piece_length_um": 10,
+      "sensor_begin_um": 25,
+      "sensor_end_um": 30,
+      "initial_command": "LOW",
+      "motor_power": "HIGH",
+      "sensor_power": "HIGH",
+      "connections": [
+        {
+          "source": {
+            "entity": "a0000005-0000-4000-8000-000000000005",
+            "port": "command",
+            "index": 0
+          },
+          "target": {
+            "entity": "a0000001-0000-4000-8000-000000000001",
+            "port": "plc_input",
+            "index": 0
+          },
+          "timing": "same_scan"
+        },
+        {
+          "source": {
+            "entity": "a0000004-0000-4000-8000-000000000004",
+            "port": "sensor",
+            "index": 0
+          },
+          "target": {
+            "entity": "a0000001-0000-4000-8000-000000000001",
+            "port": "plc_input",
+            "index": 1
+          },
+          "timing": "previous_step"
+        },
+        {
+          "source": {
+            "entity": "a0000001-0000-4000-8000-000000000001",
+            "port": "plc_output",
+            "index": 0
+          },
+          "target": {
+            "entity": "a0000002-0000-4000-8000-000000000002",
+            "port": "motor_command",
+            "index": 0
+          },
+          "timing": "same_scan"
+        }
+      ],
+      "events": [
+        {
+          "tick": 1,
+          "sequence": 0,
+          "target": "command",
+          "entity": "a0000005-0000-4000-8000-000000000005",
+          "value": "HIGH"
+        }
+      ]
+    }
+  },
+  "assets": []
+}

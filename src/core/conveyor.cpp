@@ -163,6 +163,8 @@ bool ConveyorSession::step() {
     snapshot.time_us = (tick_ + 1) * spec_.tick_period_us;
     snapshot.position_um = position_;
     // Existing low/high clients retain their byte images; conveyor clients use typed data.
+    snapshot.inputs.reserve(live_.plc_inputs.size());
+    snapshot.outputs.reserve(live_.plc_outputs.size());
     for (const auto& input : live_.plc_inputs) { snapshot.inputs.push_back(static_cast<std::uint8_t>(input.state)); }
     for (const auto& output : live_.plc_outputs) { snapshot.outputs.push_back(static_cast<std::uint8_t>(output.state)); }
     snapshot.conveyor = live_;
@@ -211,7 +213,7 @@ RunResult simulate_conveyor(const RunSpec& spec, std::stop_token stop) {
         if (stop.stop_requested()) { throw RunCancelled{}; }
         session.step();
     }
-    return session.result();
+    return std::move(session).result();
 }
 RunSpec conveyor_scenario() {
     RunSpec spec;

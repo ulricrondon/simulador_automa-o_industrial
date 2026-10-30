@@ -1,0 +1,15 @@
+# Preserve the original bytes, including CRLF and UTF-8, without raw-literal delimiters.
+# Each literal has at most 1024 bytes / 4096 source characters for MSVC.
+function(sim_embed_schema path output)
+  file(READ "${path}" schema_hex HEX)
+  string(LENGTH "${schema_hex}" hex_length)
+  set(encoded "")
+  set(offset 0)
+  while(offset LESS hex_length)
+    string(SUBSTRING "${schema_hex}" ${offset} 2048 chunk)
+    string(REGEX REPLACE "([0-9a-f][0-9a-f])" "\\\\x\\1" chunk "${chunk}")
+    string(APPEND encoded "\"${chunk}\"\n")
+    math(EXPR offset "${offset} + 2048")
+  endwhile()
+  set(${output} "${encoded}" PARENT_SCOPE)
+endfunction()

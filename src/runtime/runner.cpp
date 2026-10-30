@@ -52,9 +52,10 @@ void Runner::work(std::stop_token stop) {
                     }
                 }
                 if (stop.stop_requested()) { throw core::RunCancelled{}; }
-                auto result = session.result();
-                result.control = core::SessionStatus{session.state(), session.next_tick(),
-                                                     session.position_um(), session.motor_state()};
+                const core::SessionStatus status{session.state(), session.next_tick(),
+                                                 session.position_um(), session.motor_state()};
+                auto result = std::move(session).result();
+                result.control = status;
                 job->promise.set_value(std::make_shared<const core::RunResult>(std::move(result)));
             } else {
                 job->promise.set_value(std::make_shared<const core::RunResult>(core::simulate(job->spec, stop)));

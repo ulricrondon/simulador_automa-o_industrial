@@ -1,5 +1,6 @@
 #pragma once
 #include "sim/core/simulation.hpp"
+#include <utility>
 
 namespace sim::core {
 // Single-owner session: controls apply only between complete simulated steps.
@@ -16,7 +17,9 @@ public:
     std::int64_t position_um() const noexcept { return position_; }
     DigitalState motor_state() const noexcept { return live_.motor_state; }
     const std::vector<CounterState>& counters() const noexcept { return counters_; }
-    const RunResult& result() const noexcept { return result_; }
+    const RunResult& result() const& noexcept { return result_; }
+    // Consuming overload: transfers the history instead of copying it.
+    RunResult result() && noexcept { return std::move(result_); }
 private:
     void record(Phase phase, TransitionKind kind, std::uint32_t index,
                 DigitalState value, bool end_of_step = false);

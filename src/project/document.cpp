@@ -105,8 +105,8 @@ void check_semantics(const Document& doc) {
     register_id(doc.axis_id);
     require(doc.conveyor_ids.has_value() == doc.simulation.conveyor.has_value(), "Conveyor identities/model mismatch");
     if (doc.conveyor_ids) {
-        const auto& ids = *doc.conveyor_ids;
-        for (const auto* id : {&ids.plc_id, &ids.motor_id, &ids.piece_id, &ids.sensor_id, &ids.command_id}) {
+        const auto& conveyor_ids = *doc.conveyor_ids;
+        for (const auto* id : {&conveyor_ids.plc_id, &conveyor_ids.motor_id, &conveyor_ids.piece_id, &conveyor_ids.sensor_id, &conveyor_ids.command_id}) {
             register_id(*id);
         }
     }
