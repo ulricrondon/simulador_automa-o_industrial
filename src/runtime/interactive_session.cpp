@@ -1,5 +1,6 @@
 #include "sim/runtime/interactive_session.hpp"
 #include "sim/core/conveyor.hpp"
+#include "session_diagnostics.hpp"
 #include <algorithm>
 #include <condition_variable>
 #include <deque>
@@ -80,6 +81,7 @@ struct InteractiveSession::Data {
     // Separate from mutex: publication() waits only for a pointer swap.
     mutable std::mutex publication_mutex;
     std::shared_ptr<const SessionPublication> published;
+    detail::DiagnosticStore diagnostics;
     std::uint64_t applied{};
     std::promise<void> finished;
     std::shared_future<void> completion = finished.get_future().share();
@@ -114,10 +116,33 @@ struct InteractiveSession::Data {
         std::lock_guard lock(publication_mutex);
         published.swap(next);
     }
-    void settle(const Request& r, CommandCode code, core::Tick tick) {
+    DiagnosticContext context(const SessionCommand& command, DiagnosticStage stage,
+                              std::optional<core::Tick> tick = {}) const {
+        DiagnosticContext value;
+        value.session_id = session_id; value.command_id = command.id; value.command = command.kind;
+        value.stage = stage; value.tick = tick;
+        if (stage != DiagnosticStage::admission) { value.state = current.state; }
+        return value;
+    }
+    DiagnosticPtr application_diagnostic(const Request& request, CommandCode code, DiagnosticReason reason,
+        std::optional<std::uint64_t> used = {}, std::optional<std::uint64_t> limit = {},
+        std::optional<std::uint64_t> requested = {}) const {
+        auto value = context(request.command, DiagnosticStage::application, current.next_tick);
+        value.used = used; value.limit = limit; value.requested = requested;
+        return detail::make_diagnostic(code, reason, std::move(value));
+    }
+    void settle(const Request& r, CommandCode code, core::Tick tick, DiagnosticPtr diagnostic = {}) {
         if (r.channel->settled) { return; }
-        CommandReply reply{r.command.id, code, tick, code == CommandCode::applied ? ++applied : 0, r.advanced};
+        if (code != CommandCode::applied && !diagnostic) {
+            const auto reason = code == CommandCode::cancelled ? DiagnosticReason::cancelled :
+                code == CommandCode::stale ? DiagnosticReason::stale_boundary :
+                code == CommandCode::execution_error ? DiagnosticReason::unknown_exception : DiagnosticReason::invalid_state;
+            diagnostic = application_diagnostic(r, code, reason);
+        }
+        CommandReply reply{r.command.id, code, tick, code == CommandCode::applied ? ++applied : 0, r.advanced, diagnostic};
         commands.push({r.command, reply});
+        if (diagnostic && !(current.diagnostic && diagnostic != current.diagnostic &&
+            (code == CommandCode::cancelled || code == CommandCode::execution_error))) { diagnostics.store(diagnostic); }
         r.channel->settled = true;
         r.channel->promise.set_value(reply);
     }
@@ -145,25 +170,40 @@ struct InteractiveSession::Data {
         auto channel = std::make_shared<Channel>();
         auto future = channel->promise.get_future().share();
         auto code = CommandCode::accepted;
+        DiagnosticPtr diagnostic;
+        const auto reject = [&](CommandCode failure, DiagnosticReason reason,
+                                std::optional<std::uint64_t> used = {}, std::optional<std::uint64_t> limit = {},
+                                std::optional<std::uint64_t> requested = {}) {
+            code = failure;
+            auto value = context(command, DiagnosticStage::admission);
+            value.used = used; value.limit = limit; value.requested = requested;
+            diagnostic = detail::make_diagnostic(code, reason, std::move(value));
+        };
         const bool advancing = command.kind == CommandKind::step || command.kind == CommandKind::advance;
-        if (closing) { code = CommandCode::closed; }
-        else if (command.session_id != session_id || command.id == 0 || command.id <= last_id) { code = CommandCode::stale; }
-        else if (command.kind < CommandKind::start || command.kind > CommandKind::advance ||
-            (command.kind == CommandKind::advance && (command.ticks == 0 || command.ticks > horizon)) ||
-            (command.kind == CommandKind::input && (!core::valid(command.value) || command.boundary >= horizon ||
-             (command.target != core::ExternalTarget::command && command.target != core::ExternalTarget::motor_power && command.target != core::ExternalTarget::sensor_power)))) { code = CommandCode::invalid; }
-        else if (stop_requested) { code = CommandCode::invalid; }
+        if (closing) { reject(CommandCode::closed, DiagnosticReason::session_closed); }
+        else if (command.session_id != session_id) { reject(CommandCode::stale, DiagnosticReason::wrong_session, {}, {}, command.session_id); }
+        else if (command.id == 0 || command.id <= last_id) { reject(CommandCode::stale, DiagnosticReason::stale_id, last_id, {}, command.id); }
+        else if (command.kind < CommandKind::start || command.kind > CommandKind::advance) { reject(CommandCode::invalid, DiagnosticReason::invalid_command); }
+        else if (command.kind == CommandKind::advance && (command.ticks == 0 || command.ticks > horizon)) {
+            reject(CommandCode::invalid, DiagnosticReason::horizon, {}, horizon, command.ticks);
+        } else if (command.kind == CommandKind::input && !core::valid(command.value)) { reject(CommandCode::invalid, DiagnosticReason::invalid_value); }
+        else if (command.kind == CommandKind::input && command.boundary >= horizon) { reject(CommandCode::invalid, DiagnosticReason::horizon, {}, horizon, command.boundary); }
+        else if (command.kind == CommandKind::input && command.target != core::ExternalTarget::command &&
+            command.target != core::ExternalTarget::motor_power && command.target != core::ExternalTarget::sensor_power) {
+            reject(CommandCode::invalid, DiagnosticReason::invalid_target);
+        } else if (stop_requested) { reject(CommandCode::invalid, DiagnosticReason::stop_pending); }
         else if (command.kind == CommandKind::stop) {
             stop_slot = Request{command, channel}; stop_requested = true; last_id = command.id;
-        } else if ((advancing && advances == limits.advance_requests) ||
-                   (command.kind == CommandKind::input && inputs == limits.functional_commands) ||
-                   (!advancing && command.kind != CommandKind::input && controls == limits.commands)) { code = CommandCode::history_limit; }
-        else if (queue.size() == limits.queue_capacity) { code = CommandCode::queue_full; }
+        } else if (advancing && advances == limits.advance_requests) { reject(CommandCode::history_limit, DiagnosticReason::advance_budget, advances, limits.advance_requests, 1); }
+        else if (command.kind == CommandKind::input && inputs == limits.functional_commands) { reject(CommandCode::history_limit, DiagnosticReason::input_budget, inputs, limits.functional_commands, 1); }
+        else if (!advancing && command.kind != CommandKind::input && controls == limits.commands) { reject(CommandCode::history_limit, DiagnosticReason::control_budget, controls, limits.commands, 1); }
+        else if (queue.size() == limits.queue_capacity) { reject(CommandCode::queue_full, DiagnosticReason::queue_capacity, queue.size(), limits.queue_capacity, 1); }
         else {
             queue.push_back({command, channel}); last_id = command.id;
             if (advancing) { ++advances; } else if (command.kind == CommandKind::input) { ++inputs; } else { ++controls; }
         }
-        CommandReply receipt{command.id, code, 0, 0, 0};
+        CommandReply receipt{command.id, code, 0, 0, 0, diagnostic};
+        if (diagnostic) { diagnostics.store(diagnostic); }
         if (code != CommandCode::accepted) { channel->settled = true; channel->promise.set_value(receipt); }
         return {receipt, std::move(future)};
     }
@@ -210,7 +250,9 @@ struct InteractiveSession::Data {
                     if (terminal) { settle(*request, CommandCode::invalid, p.next_tick); inflight.reset(); continue; }
                     if (kind == CommandKind::input) {
                         if (!engine || request->command.boundary < p.next_tick) {
-                            settle(*request, engine ? CommandCode::stale : CommandCode::invalid, p.next_tick);
+                            settle(*request, engine ? CommandCode::stale : CommandCode::invalid, p.next_tick,
+                                application_diagnostic(*request, engine ? CommandCode::stale : CommandCode::invalid,
+                                    engine ? DiagnosticReason::stale_boundary : DiagnosticReason::invalid_state, {}, {}, request->command.boundary));
                         } else { pending.push_back(*request); }
                         inflight.reset(); continue;
                     }
@@ -219,16 +261,20 @@ struct InteractiveSession::Data {
                         (advancing && p.state == InteractiveState::running && !active) ||
                         (kind == CommandKind::pause && p.state == InteractiveState::running) ||
                         (kind == CommandKind::resume && p.state == InteractiveState::paused);
-                    if (!allowed) { settle(*request, CommandCode::invalid, p.next_tick); inflight.reset(); continue; }
+                    if (!allowed) { settle(*request, CommandCode::invalid, p.next_tick, application_diagnostic(*request, CommandCode::invalid,
+                        advancing && active ? DiagnosticReason::advance_active : DiagnosticReason::invalid_state)); inflight.reset(); continue; }
                     if (advancing) {
                         const auto requested = kind == CommandKind::step ? 1 : request->command.ticks;
-                        if (requested > horizon - p.next_tick) { settle(*request, CommandCode::invalid, p.next_tick); }
+                        if (requested > horizon - p.next_tick) { settle(*request, CommandCode::invalid, p.next_tick,
+                            application_diagnostic(*request, CommandCode::invalid, DiagnosticReason::horizon, p.next_tick, horizon, requested)); }
                         else { active = *request; active->begin = p.next_tick; }
                         inflight.reset(); continue;
                     }
                     if (kind != CommandKind::start && retained_events() >= limits.events) {
-                        settle(*request, CommandCode::history_limit, p.next_tick); p.error = CommandCode::history_limit;
-                        p.state = InteractiveState::failed; cancel_pending(); publish(); inflight.reset(); continue;
+                        p.diagnostic = application_diagnostic(*request, CommandCode::history_limit, DiagnosticReason::event_budget, retained_events(), limits.events, 1);
+                        p.error = CommandCode::history_limit;
+                        p.state = InteractiveState::failed; cancel_pending(); publish();
+                        settle(*request, CommandCode::history_limit, p.next_tick, p.diagnostic); inflight.reset(); continue;
                     }
                     if (kind == CommandKind::start) {
                         engine = std::make_unique<core::ConveyorSession>(*configuration, false); p.state = InteractiveState::running;
@@ -244,9 +290,15 @@ struct InteractiveSession::Data {
                 const auto retained = retained_events();
                 if ((limits.history == HistoryMode::full && trace.size() == limits.snapshots) ||
                     retained > limits.events || step_records(boundary, count) > limits.events - retained) {
-                    settle(*active, CommandCode::history_limit, active->begin); active.reset();
+                    const bool snapshots_full = limits.history == HistoryMode::full && trace.size() == limits.snapshots;
+                    p.diagnostic = application_diagnostic(*active, CommandCode::history_limit,
+                        snapshots_full ? DiagnosticReason::snapshot_budget : DiagnosticReason::event_budget,
+                        snapshots_full ? trace.size() : retained, snapshots_full ? limits.snapshots : limits.events,
+                        snapshots_full ? 1 : step_records(boundary, count));
+                    const auto failed = *active; active.reset();
                     p.state = InteractiveState::failed; p.error = CommandCode::history_limit;
-                    cancel_pending(); publish(); continue;
+                    cancel_pending(); publish();
+                    settle(failed, CommandCode::history_limit, failed.begin, p.diagnostic); continue;
                 }
                 std::vector<core::FunctionalEvent> values;
                 for (const auto& input : pending) {
@@ -270,7 +322,12 @@ struct InteractiveSession::Data {
         } catch (...) {
             std::lock_guard lock(mutex);
             current.error = CommandCode::execution_error;
-            if (inflight) { settle(*inflight, CommandCode::execution_error, current.next_tick); }
+            DiagnosticContext value;
+            value.session_id = session_id; value.tick = current.next_tick; value.state = current.state;
+            if (inflight || active) { value = context(inflight ? inflight->command : active->command, DiagnosticStage::execution, current.next_tick); }
+            current.diagnostic = detail::exception_diagnostic(std::current_exception(), std::move(value));
+            diagnostics.store(current.diagnostic);
+            if (inflight) { settle(*inflight, CommandCode::execution_error, current.next_tick, current.diagnostic); }
         }
         // No functional mutation or replay input is fabricated by cancellation.
         std::lock_guard lock(mutex);
@@ -307,6 +364,7 @@ std::vector<CommandTicket> InteractiveSession::submit_batch(const std::vector<Se
 std::shared_ptr<const SessionPublication> InteractiveSession::publication() const {
     std::lock_guard lock(data_->publication_mutex); return data_->published;
 }
+DiagnosticPtr InteractiveSession::diagnostic() const { return data_->diagnostics.load(); }
 std::shared_ptr<const SessionHistoryView> InteractiveSession::history_view() const {
     auto view = std::make_shared<SessionHistoryView>();
     view->configuration = data_->configuration;

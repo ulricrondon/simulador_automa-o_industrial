@@ -2,6 +2,7 @@
 #include "sim/runtime/runner.hpp"
 #include <atomic>
 #include <mutex>
+#include <string>
 
 namespace sim::runtime {
 enum class InteractiveState { loaded, running, paused, completed, stopped, closed, failed };
@@ -26,12 +27,36 @@ struct SessionCommand {
     core::DigitalState value{core::DigitalState::LOW};
     core::Tick ticks{1}; // Only advance: [1, configuration.ticks].
 };
+enum class DiagnosticReason {
+    session_closed, wrong_session, stale_id, invalid_command, invalid_value, invalid_target,
+    horizon, stop_pending, queue_capacity, control_budget, input_budget, advance_budget,
+    snapshot_budget, event_budget, invalid_state, stale_boundary, advance_active,
+    cancelled, known_exception, unknown_exception, allocation_failure
+};
+enum class DiagnosticStage { admission, application, execution };
+struct DiagnosticContext {
+    std::uint64_t session_id{};
+    std::optional<std::uint64_t> command_id;
+    std::optional<CommandKind> command;
+    std::optional<core::Tick> tick; // Absent at admission: no fabricated application tick.
+    std::optional<InteractiveState> state;
+    std::optional<std::uint64_t> used, limit, requested;
+    DiagnosticStage stage{DiagnosticStage::admission};
+};
+struct SessionDiagnostic {
+    CommandCode code{};
+    DiagnosticReason reason{};
+    std::string message; // Bounded, plain text; presentation must not interpret as markup.
+    DiagnosticContext context;
+};
+using DiagnosticPtr = std::shared_ptr<const SessionDiagnostic>;
 struct CommandReply {
     std::uint64_t id{};
     CommandCode code{};
     core::Tick tick{};
     std::uint64_t application_sequence{};
     core::Tick advanced_ticks{}; // Includes a partially cancelled advance.
+    DiagnosticPtr diagnostic{};
 };
 struct CommandTicket {
     CommandReply acceptance;
@@ -51,6 +76,7 @@ struct SessionPublication {
     std::optional<core::Tick> first_tick, last_tick;
     std::size_t discarded_snapshots{};
     CommandCode error{CommandCode::applied};
+    DiagnosticPtr diagnostic{}; // Failure causing failed/closed; retained across cancellation.
 };
 struct ReplayAction {
     CommandKind kind{};
@@ -116,6 +142,8 @@ public:
     // Nonblocking cancellation request; completion becomes ready after teardown.
     std::shared_future<void> request_close();
     std::shared_ptr<const SessionPublication> publication() const;
+    // Latest rejection/failure; independent of step/history locks. Null before any diagnostic.
+    DiagnosticPtr diagnostic() const;
     // Deep copy made outside session locks: expensive for the caller, not for the session.
     std::shared_ptr<const SessionHistory> history() const;
     std::shared_ptr<const SessionHistoryView> history_view() const;
