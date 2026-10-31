@@ -3,6 +3,7 @@
 #include <atomic>
 #include <mutex>
 #include <string>
+#include <variant>
 
 namespace sim::runtime {
 enum class InteractiveState { loaded, running, paused, completed, stopped, closed, failed };
@@ -78,6 +79,40 @@ struct SessionPublication {
     CommandCode error{CommandCode::applied};
     DiagnosticPtr diagnostic{}; // Failure causing failed/closed; retained across cancellation.
 };
+// Observation storage is bounded independently of the durable functional event log.
+inline constexpr std::size_t observation_block_size = 256;
+inline constexpr std::size_t observation_max_blocks = 32; // Nominal capacity: 8192 records.
+// Two partial endpoints may require one extra physical block, without extra records.
+inline constexpr std::size_t observation_storage_blocks = observation_max_blocks + 1;
+struct ObservationEvent {
+    std::uint64_t sequence{}; // Contiguous event cursor, starting at zero per session.
+    std::uint64_t publication_sequence{}; // Functional boundary; orders controls without ticks.
+    core::Tick tick{};
+    std::uint64_t time_us{};
+    core::Phase phase{};
+    std::uint32_t phase_order{}; // Counter/output ordering within the phase.
+    std::variant<core::Transition, core::CounterEvent> value;
+};
+struct ObservationEvents {
+    std::vector<std::shared_ptr<const std::vector<ObservationEvent>>> blocks;
+    std::uint64_t first_sequence{}, next_sequence{}; // Half-open retained range.
+};
+struct SessionObservation {
+    SessionPublication publication;
+    std::optional<core::SessionStatus> control;
+    std::shared_ptr<const ObservationEvents> events;
+};
+struct ObservationCursor {
+    std::uint64_t session_id{}, next_sequence{};
+};
+struct ObservationPage {
+    std::vector<ObservationEvent> events;
+    ObservationCursor next;
+    std::uint64_t lost{}; // Requested records evicted from the presentation window.
+};
+// Pure bounded paging of ONE retained observation. Wrong-session/future cursors throw.
+ObservationPage observation_events(const SessionObservation& observation, ObservationCursor cursor,
+                                   std::size_t max_count = observation_block_size);
 struct ReplayAction {
     CommandKind kind{};
     core::Tick tick{};
@@ -144,6 +179,8 @@ public:
     std::shared_ptr<const SessionPublication> publication() const;
     // Latest rejection/failure; independent of step/history locks. Null before any diagnostic.
     DiagnosticPtr diagnostic() const;
+    // Constant-size pointer acquisition; never takes the functional/history mutex.
+    std::shared_ptr<const SessionObservation> observation() const;
     // Deep copy made outside session locks: expensive for the caller, not for the session.
     std::shared_ptr<const SessionHistory> history() const;
     std::shared_ptr<const SessionHistoryView> history_view() const;

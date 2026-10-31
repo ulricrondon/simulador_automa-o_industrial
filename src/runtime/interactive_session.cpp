@@ -5,6 +5,7 @@
 #include <condition_variable>
 #include <deque>
 #include <iterator>
+#include <tuple>
 
 namespace sim::runtime {
 namespace {
@@ -81,6 +82,8 @@ struct InteractiveSession::Data {
     // Separate from mutex: publication() waits only for a pointer swap.
     mutable std::mutex publication_mutex;
     std::shared_ptr<const SessionPublication> published;
+    std::shared_ptr<const SessionObservation> observed;
+    std::shared_ptr<const ObservationEvents> observation_window = std::make_shared<const ObservationEvents>();
     detail::DiagnosticStore diagnostics;
     std::uint64_t applied{};
     std::promise<void> finished;
@@ -101,6 +104,7 @@ struct InteractiveSession::Data {
         plant_records = static_cast<std::size_t>(wired_inputs) + program.rungs.size() + static_cast<std::size_t>(counters) + 3;
         current.session_id = id;
         published = std::make_shared<const SessionPublication>(current);
+        observed = std::make_shared<const SessionObservation>(SessionObservation{current, control, observation_window});
     }
     std::size_t retained_events() const noexcept { return events.size() + counter_events.size(); }
     std::size_t step_records(core::Tick boundary, std::size_t boundary_inputs) const {
@@ -113,8 +117,10 @@ struct InteractiveSession::Data {
         p.first_tick.reset(); p.last_tick.reset();
         if (!trace.empty()) { p.first_tick = trace.front()->tick; p.last_tick = trace.back()->tick; }
         auto next = std::make_shared<const SessionPublication>(p);
+        auto next_observation = std::make_shared<const SessionObservation>(SessionObservation{p, control, observation_window});
         std::lock_guard lock(publication_mutex);
         published.swap(next);
+        observed.swap(next_observation);
     }
     DiagnosticContext context(const SessionCommand& command, DiagnosticStage stage,
                               std::optional<core::Tick> tick = {}) const {
@@ -150,8 +156,61 @@ struct InteractiveSession::Data {
                 core::DigitalState value = core::DigitalState::LOW) {
         journal.push({kind, tick, target, value});
     }
+    void observe_events(const core::RunResult& batch) {
+        if (batch.events.empty() && batch.counter_events.empty()) { return; }
+        std::vector<ObservationEvent> ordered;
+        ordered.reserve(batch.events.size() + batch.counter_events.size());
+        for (const auto& e : batch.events) {
+            std::uint32_t order = 1; // Ladder outputs follow counter updates.
+            if (e.phase == core::Phase::control) {
+                order = e.kind == core::TransitionKind::plc_output ? 0u : 2u;
+            }
+            ordered.push_back({0, current.sequence + 1, e.tick, e.time_us, e.phase, order, e});
+        }
+        for (const auto& e : batch.counter_events) {
+            ordered.push_back({0, current.sequence + 1, e.tick, e.time_us,
+                e.stopped ? core::Phase::control : core::Phase::ladder, e.stopped ? 1u : 0u, e});
+        }
+        std::stable_sort(ordered.begin(), ordered.end(), [](const auto& a, const auto& b) {
+            return std::tie(a.time_us, a.tick, a.phase, a.phase_order) <
+                   std::tie(b.time_us, b.tick, b.phase, b.phase_order);
+        });
+        auto window = std::make_shared<ObservationEvents>(*observation_window);
+        for (auto& event : ordered) { event.sequence = window->next_sequence++; }
+        constexpr auto capacity = observation_block_size * observation_max_blocks;
+        const auto first_sequence = window->next_sequence > capacity ? window->next_sequence - capacity : 0;
+        // Evict by record count, not by number of allocations. Never mutate shared blocks.
+        std::erase_if(window->blocks, [&](const auto& block) { return block->back().sequence < first_sequence; });
+        if (!window->blocks.empty() && window->blocks.front()->front().sequence < first_sequence) {
+            const auto& front = *window->blocks.front();
+            const auto skip = static_cast<std::size_t>(first_sequence - front.front().sequence);
+            window->blocks.front() = std::make_shared<const std::vector<ObservationEvent>>(
+                front.begin() + static_cast<std::ptrdiff_t>(skip), front.end());
+        }
+        std::size_t first = first_sequence > ordered.front().sequence ?
+            static_cast<std::size_t>(first_sequence - ordered.front().sequence) : 0;
+        if (!window->blocks.empty() && window->blocks.back()->size() < observation_block_size) {
+            const auto& tail = *window->blocks.back();
+            const auto count = std::min(observation_block_size - tail.size(), ordered.size() - first);
+            auto filled = std::make_shared<std::vector<ObservationEvent>>();
+            filled->reserve(tail.size() + count);
+            filled->insert(filled->end(), tail.begin(), tail.end());
+            filled->insert(filled->end(), ordered.begin() + static_cast<std::ptrdiff_t>(first),
+                           ordered.begin() + static_cast<std::ptrdiff_t>(first + count));
+            window->blocks.back() = std::move(filled);
+            first += count;
+        }
+        for (; first < ordered.size(); first += observation_block_size) {
+            const auto end = std::min(first + observation_block_size, ordered.size());
+            window->blocks.push_back(std::make_shared<const std::vector<ObservationEvent>>(
+                ordered.begin() + static_cast<std::ptrdiff_t>(first), ordered.begin() + static_cast<std::ptrdiff_t>(end)));
+        }
+        window->first_sequence = first_sequence;
+        observation_window = std::move(window);
+    }
     void collect(core::ConveyorSession& engine) {
         auto batch = engine.drain_result();
+        observe_events(batch);
         for (auto& snapshot : batch.trace) {
             auto shared = std::make_shared<const core::Snapshot>(std::move(snapshot));
             if (limits.history == HistoryMode::bounded && trace.size() == limits.snapshots) {
@@ -363,6 +422,34 @@ std::vector<CommandTicket> InteractiveSession::submit_batch(const std::vector<Se
 }
 std::shared_ptr<const SessionPublication> InteractiveSession::publication() const {
     std::lock_guard lock(data_->publication_mutex); return data_->published;
+}
+std::shared_ptr<const SessionObservation> InteractiveSession::observation() const {
+    std::lock_guard lock(data_->publication_mutex); return data_->observed;
+}
+ObservationPage observation_events(const SessionObservation& observation, ObservationCursor cursor, std::size_t max_count) {
+    if (max_count == 0 || max_count > observation_block_size * observation_max_blocks) {
+        throw std::invalid_argument("Observation page size must be in [1, 8192]");
+    }
+    if (cursor.session_id != observation.publication.session_id || !observation.events ||
+        cursor.next_sequence > observation.events->next_sequence) {
+        throw std::invalid_argument("Observation cursor belongs to another session or future boundary");
+    }
+    const auto& window = *observation.events;
+    ObservationPage page;
+    page.next = cursor;
+    if (page.next.next_sequence < window.first_sequence) {
+        page.lost = window.first_sequence - page.next.next_sequence;
+        page.next.next_sequence = window.first_sequence;
+    }
+    for (const auto& block : window.blocks) {
+        for (const auto& event : *block) {
+            if (event.sequence < page.next.next_sequence) { continue; }
+            page.events.push_back(event);
+            page.next.next_sequence = event.sequence + 1;
+            if (page.events.size() == max_count) { return page; }
+        }
+    }
+    return page;
 }
 DiagnosticPtr InteractiveSession::diagnostic() const { return data_->diagnostics.load(); }
 std::shared_ptr<const SessionHistoryView> InteractiveSession::history_view() const {

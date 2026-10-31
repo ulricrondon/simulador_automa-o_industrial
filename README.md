@@ -105,6 +105,11 @@ Contador por borda LOW para HIGH integrado ao Ladder, com reset conservador, CV 
 Os seis comparadores inteiros de CTU.CV com constantes estao implementados. Consulte [contrato, exemplo e validacao](docs/comparisons.md) e examples/cv-compare-pulses.json. A leitura usa a imagem anterior dos contadores, sem dependencia da ordem dos rungs.
 
 
+## Aplicacao desktop
+
+Codigo Qt Widgets preparado em src/desktop, ainda nao compilado com Qt nem executado. O alvo e opcional (SIM_BUILD_DESKTOP) e os builds headless nao dependem de Qt. Veja [arquitetura, limitacoes e roteiro da primeira execucao](docs/desktop-qt.md).
+
+
 ## Reference scenarios and replay
 
 Cenarios integrados: examples/reference-conveyor.json (uma passagem fisica) e examples/reference-pulses.json (pulsos controlados). O console oferece replay para comparar duas execucoes novas e inspect para observar ate 64 snapshots. Veja [contrato, aceitacao e resultados](docs/reference-replay.md).

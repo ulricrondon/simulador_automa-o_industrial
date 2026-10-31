@@ -35,6 +35,23 @@
       }
     },
     {
+      "name": "windows-msvc-desktop-debug",
+      "displayName": "Windows x64 / MSVC / Debug / Qt Widgets",
+      "inherits": "windows-msvc-debug",
+      "cacheVariables": {
+        "SIM_BUILD_DESKTOP": "ON",
+        "VCPKG_MANIFEST_FEATURES": "tests;project;desktop"
+      }
+    },
+    {
+      "name": "windows-msvc-desktop-release",
+      "displayName": "Windows x64 / MSVC / Release / Qt Widgets",
+      "inherits": "windows-msvc-desktop-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
       "name": "headless-local",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/${presetName}",
@@ -52,6 +69,14 @@
     {
       "name": "windows-msvc-release",
       "configurePreset": "windows-msvc-release"
+    },
+    {
+      "name": "windows-msvc-desktop-debug",
+      "configurePreset": "windows-msvc-desktop-debug"
+    },
+    {
+      "name": "windows-msvc-desktop-release",
+      "configurePreset": "windows-msvc-desktop-release"
     },
     {
       "name": "headless-local",

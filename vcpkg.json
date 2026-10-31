@@ -25,7 +25,7 @@
       ]
     },
     "desktop": {
-      "description": "Reserved dependencies; desktop application pending",
+      "description": "Qt Widgets desktop application",
       "dependencies": [
         {
           "name": "qtbase",
@@ -34,7 +34,12 @@
             "widgets",
             "opengl"
           ]
-        },
+        }
+      ]
+    },
+    "visualization": {
+      "description": "Reserved dependencies; 3D scene pending",
+      "dependencies": [
         {
           "name": "vtk",
           "default-features": false,
