@@ -1,14 +1,17 @@
 #pragma once
 #include "sim/core/simulation.hpp"
 #include <utility>
+#include <span>
 
 namespace sim::core {
 // Single-owner session: controls apply only between complete simulated steps.
 // It performs no waiting, background scheduling or wall-clock measurement.
 class ConveyorSession {
 public:
-    explicit ConveyorSession(RunSpec spec);
-    bool step();
+    explicit ConveyorSession(RunSpec spec, bool reserve_history = true);
+    bool step(std::span<const FunctionalEvent> boundary_inputs = {});
+    // Transfer emitted records; functional state is retained by this single owner.
+    RunResult drain_result() noexcept { return std::exchange(result_, {}); }
     void pause();
     void resume();
     void stop();

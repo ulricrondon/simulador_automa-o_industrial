@@ -70,7 +70,7 @@ void validate_conveyor(const RunSpec& spec) {
         require(sequences.insert(event.sequence).second, "Duplicate functional event sequence");
     }
 }
-ConveyorSession::ConveyorSession(RunSpec spec) : spec_(std::move(spec)) {
+ConveyorSession::ConveyorSession(RunSpec spec, bool reserve_history) : spec_(std::move(spec)) {
     require(spec_.conveyor.has_value(), "Conveyor session requires a conveyor model");
     validate(spec_);
     auto& c = *spec_.conveyor;
@@ -87,19 +87,23 @@ ConveyorSession::ConveyorSession(RunSpec spec) : spec_(std::move(spec)) {
     counters_.resize(spec_.program.output_count);
     live_.sensor_state = detect(c, live_.sensor_power, position_, position_);
     live_.sampled_sensor = live_.sensor_state;
-    result_.trace.reserve(static_cast<std::size_t>(spec_.ticks));
+    if (reserve_history) { result_.trace.reserve(static_cast<std::size_t>(spec_.ticks)); }
 }
 void ConveyorSession::record(Phase phase, TransitionKind kind, std::uint32_t index,
                              DigitalState value, bool end_of_step) {
     result_.events.push_back({tick_, (tick_ + (end_of_step ? 1 : 0)) * spec_.tick_period_us,
                               phase, kind, index, value, position_});
 }
-bool ConveyorSession::step() {
+bool ConveyorSession::step(std::span<const FunctionalEvent> boundary_inputs) {
     if (state_ != SessionState::running) { return false; }
     const auto& c = *spec_.conveyor;
+    for (const auto& event : boundary_inputs) {
+        require(event.tick == tick_ && valid(event.value), "Invalid boundary input");
+        require(event.target == ExternalTarget::command || event.target == ExternalTarget::motor_power ||
+                event.target == ExternalTarget::sensor_power, "Invalid boundary target");
+    }
     // 1. External events at the start boundary, ordered by (tick, sequence).
-    while (next_event_ < c.events.size() && c.events[next_event_].tick == tick_) {
-        const auto& event = c.events[next_event_++];
+    const auto apply = [&](const FunctionalEvent& event) {
         auto* destination = &live_.command.state;
         auto kind = TransitionKind::command;
         if (event.target == ExternalTarget::motor_power) {
@@ -112,6 +116,9 @@ bool ConveyorSession::step() {
             record(Phase::external, kind, 0, event.value);
         }
     }
+    ;
+    while (next_event_ < c.events.size() && c.events[next_event_].tick == tick_) { apply(c.events[next_event_++]); }
+    for (const auto& event : boundary_inputs) { apply(event); }
     // 2. One coherent PLC input image. Geometry feedback comes from the prior step.
     live_.sampled_sensor = live_.sensor_state;
     auto inputs = std::vector<PlcInput>(spec_.program.input_count);
